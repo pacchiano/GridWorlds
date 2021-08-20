@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import matplotlib 
 import matplotlib.pyplot as plt
 
@@ -20,6 +16,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 import IPython
+from environments import run_walk
 
 
 class MLPNetwork(nn.Module):
@@ -108,18 +105,15 @@ class RandomPolicy:
 
 
 
-def test_policy(env, policy, num_trials, num_env_steps, trajectory_feedback = False):
+def test_policy(env, policy, num_trials, num_env_steps):
   base_success_nums = []
   collected_base_rewards = []
 
   for i in range(num_trials):
     env.restart_env()
-    node_path1, _,states, _, rewards1  = run_walk(env, policy, num_env_steps, trajectory_feedback)
+    node_path1, _,states, _, rewards1  = run_walk(env, policy, num_env_steps)
     base_success_nums.append( tuple(node_path1[-1].numpy())==env.destination_node)
-    if trajectory_feedback:
-      collected_base_rewards.append(env.trajectory_reward)
-    else:
-      collected_base_rewards.append(sum(rewards1))
+    collected_base_rewards.append(sum(rewards1))
   base_success_num= np.mean(base_success_nums)
   base_rewards = np.mean(collected_base_rewards)
 

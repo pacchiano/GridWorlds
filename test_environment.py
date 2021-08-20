@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import matplotlib 
 import matplotlib.pyplot as plt
 
@@ -27,7 +23,6 @@ from policies import *
 length = 10
 height = 10
 
-#graph = get_grid_graph(length, height)
 env = GridEnvironment(length, height)
 #policy = RandomGridPolicy()
 policy = RandomPolicy()

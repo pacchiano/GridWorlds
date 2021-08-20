@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import matplotlib 
 import matplotlib.pyplot as plt
 import torch 
@@ -81,6 +77,8 @@ class GridEnvironment:
     self.graph = get_grid_graph(height, length, sparsity = sparsity)
     self.initial_graph_edges = list(self.graph.edges) 
     
+
+
     self.location_normalized = location_normalized  
 
     self.state_representation = state_representation
@@ -102,13 +100,20 @@ class GridEnvironment:
     self.initial_node = random.choice(list(self.graph.nodes))
     self.destination_node = random.choice(list(self.graph.nodes))
     
-    #IPython.embed()
     self.curr_node = self.initial_node
     self.end = False
     self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
 
 
+    self.P = torch.eye(self.get_state_dim())
 
+
+
+  def add_linear_transformation(self, P):
+    self.P = P
+
+  def reset_linear_transformation(self):
+    self.P = torch.eye(self.get_state_dim())
 
   def reverse_environment(self):
     self.reversed_actions = not self.reversed_actions
@@ -173,11 +178,7 @@ class GridEnvironment:
 
 
   ### OUTPUTS the current state as a pytorch tensor.
-  def get_state(self):
-    neighbors = list(self.graph.neighbors(self.curr_node))
-    neighbors_distances = [self.shortest_paths[n] for n in neighbors]
-    state = (self.curr_node, self.shortest_paths[self.curr_node],neighbors, neighbors_distances, self.end)
-    
+  def get_state(self):    
     return self.get_state_helper(self.curr_node)
 
   def get_state_helper(self, curr_node):
@@ -195,7 +196,8 @@ class GridEnvironment:
         state = state/(max(self.length, self.height)*1.0)
     else:
       raise ValueError("State representation type not availale - {}".format(self.state_representation))
-    return state
+
+    return torch.matmul(self.P, state.flatten())
 
 
   ### outputs the reward of executing action on node.
@@ -257,7 +259,7 @@ class GridEnvironment:
 
 
 ## 
-def run_walk(env, policy, max_time = 1000, trajectory_feedback = False):
+def run_walk(env, policy, max_time = 1000):
   time_counter = 0
   node_path =  []
   states = []
@@ -266,10 +268,18 @@ def run_walk(env, policy, max_time = 1000, trajectory_feedback = False):
 
   rewards = []
 
+  # counter = 1
 
   while env.manhattan_reward or not env.end:
     node_path.append(torch.from_numpy(np.array(env.curr_node)))
     states.append(env.get_state())
+      
+    # counter +=1 
+
+    # if counter > 5:
+    #   IPython.embed()
+    #   raise ValueError("asdlf;km")
+
     action_index = policy.get_action(env.get_state().flatten())
     old_vertex = env.curr_node
     _, r = env.step(action_index)
@@ -284,8 +294,6 @@ def run_walk(env, policy, max_time = 1000, trajectory_feedback = False):
   #action_indices.append(policy.get_action(env.get_state()))
   # IPython.embed()
   # raise ValueError("asldfkm")
-  if trajectory_feedback:
-    rewards = [None]*len(rewards) 
   return node_path, edge_path, states, action_indices, rewards
 
 
@@ -301,8 +309,6 @@ def save_graph_diagnostic_image(env, policy, num_steps, num_paths, title, filena
 
   nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.initial_node], node_size=90, node_color = "blue")
   if env.destination_node != None:
-    if env.name == "GridNonMarkovian":
-      nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=env.goal_region, node_size=90, node_color = "red")
     nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.destination_node], node_size=90, node_color = "black")
 
 
