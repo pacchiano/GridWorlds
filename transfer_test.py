@@ -62,33 +62,8 @@ save_graph_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample path
 policy, training_reward_evolution, training_success_evolution = learn_pg(env, policy, num_pg_steps, 
 	trajectory_batch_size, num_env_steps, verbose = verbose)
 
-pg_rewards, pg_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
+pg_rewards, pg_success_num, optimal_policy_trajectories = test_policy(env, policy, success_num_trials, num_env_steps)
 
-
-### Plot Successes
-plt.close("all")
-plt.title("Successes evolution")
-plt.xlabel("Num trajectories")
-plt.ylabel("Avg Successs")
-plt.plot((np.arange(num_pg_steps) + 1)*trajectory_batch_size,  training_success_evolution, label = "avg successes", linewidth = 3.5, color = "red")
-plt.savefig("./figs/avg_successes.png")
-plt.close('all')
-
-
-### Plot rewards
-plt.close("all")
-plt.title("Rewards evolution")
-plt.xlabel("Num trajectories")
-plt.ylabel("Avg Reward")
-plt.plot((np.arange(num_pg_steps) + 1)*trajectory_batch_size,  training_reward_evolution, label = "avg rewards", linewidth = 3.5, color = "red")
-plt.savefig("./figs/avg_rewards.png")
-plt.close('all')
-
-
-
-
-
-save_graph_diagnostic_image(env, policy, num_env_steps, 10, "After PG", "./figs/after_pg.png")
 
 #print("Sum policy params after PG ", torch.sum(policy.policy_params))
 print("Base success num ",  base_success_num)
@@ -97,11 +72,9 @@ print("PG success num ", pg_success_num)
 print("PG rewards ",pg_rewards )
 
 
-
-
-
 ### Change the linear multiplier for the environment. 
 P = np.arange(state_dim) + 1
+P += torch.normal(torch.zeros((state_dim, state_dim)))
 P = P/(1.0*state_dim)
 P = np.diag(P)
 P = torch.tensor(P).float()
@@ -115,36 +88,17 @@ print("Rewards after P change ", P_rewards)
 print("Successes after P change ", P_success_num)
 
 
-### Plot Successes
-plt.close("all")
-plt.title("Successes evolution")
-plt.xlabel("Num trajectories")
-plt.ylabel("Avg Successs")
-plt.plot((np.arange(num_pg_steps) + 1)*trajectory_batch_size,  training_success_evolution, label = "avg successes", linewidth = 3.5, color = "red")
-plt.savefig("./figs/avg_successes_P.png")
-plt.close('all')
 
-
-### Plot rewards
-plt.close("all")
-plt.title("Rewards evolution")
-plt.xlabel("Num trajectories")
-plt.ylabel("Avg Reward")
-plt.plot((np.arange(num_pg_steps) + 1)*trajectory_batch_size,  training_reward_evolution, label = "avg rewards", linewidth = 3.5, color = "red")
-plt.savefig("./figs/avg_rewards_P.png")
-plt.close('all')
+IPython.embed()
 
 
 
 
 
-save_graph_diagnostic_image(env, policy, num_env_steps, 10, "After PG", "./figs/after_P_change.png")
 
-#print("Sum policy params after PG ", torch.sum(policy.policy_params))
-print("P change Base success num ",  base_success_num)
-print("P change Base rewards ", base_rewards)
-print("P change PG success num ", P_success_num)
-print("P change PG rewards ",P_rewards )
+
+
+
 
 
 

@@ -108,14 +108,18 @@ class RandomPolicy:
 def test_policy(env, policy, num_trials, num_env_steps):
   base_success_nums = []
   collected_base_rewards = []
+  trajectories = []
+
 
   for i in range(num_trials):
     env.restart_env()
     node_path1, _,states, _, rewards1  = run_walk(env, policy, num_env_steps)
     base_success_nums.append( tuple(node_path1[-1].numpy())==env.destination_node)
     collected_base_rewards.append(sum(rewards1))
+    trajectories.append(states)
+
   base_success_num= np.mean(base_success_nums)
   base_rewards = np.mean(collected_base_rewards)
 
-  return base_rewards, base_success_num
+  return base_rewards, base_success_num, trajectories
 
