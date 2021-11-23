@@ -24,11 +24,11 @@ from policies import *
 
 ## Test Tabular Policy
 
-length = 10
-height = 10
-num_env_steps = 30
+length = 30
+height = 20
+num_env_steps = 60
 success_num_trials = 100
-num_pg_steps = 100
+num_pg_steps = 300
 stepsize = 1
 trajectory_batch_size = 30
 manhattan_reward = False
@@ -54,10 +54,9 @@ policy = NNPolicy(state_dim, num_actions)
 
 
 base_rewards, base_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
-save_graph_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample paths" , "./figs/initial_sample_paths.png")
+save_graph_diagnostic_image( env, policy, num_env_steps, 2,"Initial sample paths" , "./figs/initial_sample_paths.png")
+save_grid_diagnostic_image(env, policy, num_env_steps, 2, "Initial sample paths", "./figs/initial_sample_paths_grid.png")
 
-
-#optimizer = torch.optim.Adam([policy.policy_params], lr=0.01)
 
 policy, training_reward_evolution, training_success_evolution = learn_pg(env, policy, num_pg_steps, 
 	trajectory_batch_size, num_env_steps, verbose = verbose)
@@ -88,7 +87,11 @@ plt.close('all')
 
 
 
-save_graph_diagnostic_image(env, policy, num_env_steps, 10, "After PG", "./figs/after_pg.png")
+
+save_graph_diagnostic_image(env, policy, num_env_steps, 2, "After PG", "./figs/after_pg.png")
+save_grid_diagnostic_image(env, policy, num_env_steps, 2, "After PG", "./figs/after_pg_grid.png")
+
+
 
 #print("Sum policy params after PG ", torch.sum(policy.policy_params))
 print("Base success num ",  base_success_num)
@@ -138,7 +141,10 @@ plt.close('all')
 
 
 
-save_graph_diagnostic_image(env, policy, num_env_steps, 10, "After PG", "./figs/after_P_change.png")
+save_graph_diagnostic_image(env, policy, num_env_steps, 2, "P change", "./figs/after_P_change.png")
+save_grid_diagnostic_image(env, policy, num_env_steps, 2, "P change", "./figs/after_P_change_grid.png")
+
+
 
 #print("Sum policy params after PG ", torch.sum(policy.policy_params))
 print("P change Base success num ",  base_success_num)

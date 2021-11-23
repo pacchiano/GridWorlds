@@ -16,7 +16,8 @@ import torch
 import IPython
 from environments import run_walk
 
-def learn_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, verbose = False, supress_training_curve = True, logging_frequency = None, reset_env = True, trajectory_feedback = False):
+def learn_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, verbose = False, supress_training_curve = True, 
+	logging_frequency = None, reset_env = True, trajectory_feedback = False):
 	#optimizer = torch.optim.Adam([policy.policy_params], lr=0.01)
 	if logging_frequency == None:
 		logging_frequency = num_pg_steps
