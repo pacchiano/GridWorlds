@@ -16,8 +16,8 @@ import networkx as nx
 import IPython
 import torch
 
-from environments import *
-from policies import *
+from .environments import *
+from .policies import *
 
 
 length = 10

@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name='otdd',
+    name='gridworlds',
     version='0.1.0',
     description='Gridworlds library',
     author='David Alvarez-Melis & Aldo Pacchiano',
@@ -16,9 +16,7 @@ setup(
       'requests',
       'torch',
       'torchvision',
-      'torchtext',
       'attrdict',
-      'opentsne',
       'seaborn',
       'scikit-learn',
       'pandas'

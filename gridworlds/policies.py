@@ -16,7 +16,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 import IPython
-from environments import run_walk
+from .environments import run_walk
 
 
 class MLPNetwork(nn.Module):

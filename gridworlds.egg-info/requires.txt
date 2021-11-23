@@ -1,0 +1,12 @@
+numpy
+scipy
+matplotlib
+tqdm
+pot
+requests
+torch
+torchvision
+attrdict
+seaborn
+scikit-learn
+pandas

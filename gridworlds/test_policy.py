@@ -19,8 +19,8 @@ import torch
 from pg_learning import *
 
 import IPython
-from environments import *
-from policies import *
+from .environments import *
+from .policies import *
 
 ## Test Tabular Policy
 
