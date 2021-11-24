@@ -17,6 +17,7 @@ from networkx import grid_graph, single_target_shortest_path_length, draw, sprin
 from networkx.algorithms.components import is_connected
 import random
 import networkx as nx
+import copy
 import IPython
 #%matplotlib inline
 from matplotlib import colors as colors_matplotlib
@@ -110,14 +111,26 @@ class GridEnvironment:
 
 
     self.P = torch.eye(self.get_state_dim())
-
+    self.inverse_P = torch.eye(self.get_state_dim())
 
 
   def add_linear_transformation(self, P):
     self.P = P
+    self.inverse_P = torch.inverse(self.P)
+
 
   def reset_linear_transformation(self):
-    self.P = torch.eye(self.get_state_dim())
+    self.P = torch.eye(self.get_state_dim())  
+    self.inverse_P = torch.eye(self.get_state_dim())
+
+
+  ### Applies P{-1} to the trajectory
+  def apply_undo_map(self, trajectory):
+    undone_trajectory = copy.deepcopy(trajectory)
+    undone_trajectory['states'] = torch.matmul(undone_trajectory['states'], self.inverse_P)
+    # for key in trajectory.keys():
+    #   pass
+    return undone_trajectory
 
   def reverse_environment(self):
     self.reversed_actions = not self.reversed_actions
