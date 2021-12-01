@@ -1,0 +1,4 @@
+Mean vanilla training time 19.51448655128479
+Mean randomcore training time 20.46371579170227
+Mean reversed frozen training time 19.48050546646118
+Mean reversed unfrozen training time 19.617838501930237

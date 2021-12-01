@@ -1,0 +1,2 @@
+python test_environment.py
+python test_policy.py

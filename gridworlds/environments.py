@@ -74,16 +74,23 @@ class GridEnvironment:
               encode_goal = False, 
               sparsity = 0,
               combine_with_sparse = False,
-              reversed_actions = False):
-    
-    self.graph = get_grid_graph(height, length, sparsity = sparsity)
-    self.initial_graph_edges = list(self.graph.edges) 
+              reversed_actions = False,
+              randomization_threshold = 0):
     
 
+    self.name = "GridSimple"
+
+    self.graph = get_grid_graph(height, length, sparsity = sparsity)
+    self.initial_graph_edges = list(self.graph.edges) 
+    self.randomization_threshold = randomization_threshold
 
     self.location_normalized = location_normalized  
 
     self.state_representation = state_representation
+
+    if self.state_representation not in ["two-dim", "tabular", "overwritten" ]:
+      raise ValueError("The state representation provided is not available {}".format(self.state_representation))
+
 
     self.reversed_actions = reversed_actions
 
@@ -95,6 +102,7 @@ class GridEnvironment:
       self.actions = [(-1, 0), (1,0), (0,-1), (0, 1)]
       self.action_names = ["U", "D", "L", "R"]
       
+    self.num_actions = len(self.actions)
     self.length = length
     self.height = height
 
@@ -232,8 +240,14 @@ class GridEnvironment:
   ### Inputs
   ### action_index (int) = index of the action to take.  
   def step(self, action_index):
+    # action = self.actions[action_index]
+    # next_vertex = ( (self.curr_node[0] + action[0])%self.length ,  (self.curr_node[1] + action[1])%self.height)
     action = self.actions[action_index]
-    next_vertex = ( (self.curr_node[0] + action[0])%self.length ,  (self.curr_node[1] + action[1])%self.height)
+    if random.random() > self.randomization_threshold:
+      next_vertex = self.get_next_vertex(self.curr_node[0], self.curr_node[1], action_index)
+    else:
+      next_vertex = self.curr_node
+
     neighbors =  list(self.graph.neighbors(self.curr_node))
     reward = self.reward(self.curr_node, action)
     
@@ -250,6 +264,13 @@ class GridEnvironment:
 
     return self.curr_node, reward
 
+  def get_next_vertex(self, i,j, action_index):
+    action = self.actions[action_index]
+    next_vertex = ( (i + action[0])%self.length ,  (j + action[1])%self.height)
+    return next_vertex
+
+
+
   ### Sets the self.initial_node to initial_node
   def set_initial_node(self, initial_node):
     self.initial_node = initial_node
@@ -260,6 +281,100 @@ class GridEnvironment:
     self.destination_node = destination_node
     self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
     self.restart_env()
+
+
+
+
+
+class GridEnvironmentNonMarkovian(GridEnvironment):
+  def __init__(self,  
+              length, height, 
+              randomize = False, 
+              randomization_threshold = 0, 
+              manhattan_reward = False, 
+              tabular = True, 
+              location_based = False,
+              location_normalized = False,
+              encode_goal = False, 
+              sparsity = 0,
+              use_learned_reward_function = True,
+              reward_network_type = "MLP",
+              combine_with_sparse = False,
+              reversed_actions = False,
+              goal_region_radius = 1):
+    
+    super().__init__(length, height, randomize, randomization_threshold, manhattan_reward, tabular, location_based, 
+      location_normalized, encode_goal, sparsity, use_learned_reward_function, reward_network_type, combine_with_sparse, reversed_actions)
+
+    raise ValueError("Grid Environment Non Markovian not properly implemented. Needs to be updated to match the implementation of GridEnvironment.")
+
+    self.name = "GridNonMarkovian"
+    self.state_dim = self.get_state_dim()
+    self.goal_region_radius = goal_region_radius
+    self.trajectory_reward = 0
+    self.set_goal_region()
+    self.last_three_steps = []
+
+  def restart_env(self):
+    self.curr_node = self.initial_node 
+    self.end = False
+    self.trajectory_reward = 0
+    self.last_three_steps = []
+
+
+  def set_goal_region(self):
+      goal_region = []
+      for i in range(self.length):
+        for j in range(self.height):
+          if np.abs(i-self.destination_node[0]) + np.abs(j - self.destination_node[1]) <= self.goal_region_radius:
+            goal_region.append((i,j))
+
+      self.goal_region = goal_region
+
+  def reset_initial_and_destination(self, hard_instances):
+    self.initial_node = random.choice(list(self.graph.nodes))
+    destination_node = random.choice(list(self.graph.nodes))
+    if hard_instances:
+      while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/2:
+        self.initial_node = random.choice(list(self.graph.nodes))
+        destination_node = random.choice(list(self.graph.nodes))
+    
+    #self.destination_node = destination_node
+    self.set_destination_node(destination_node)
+    self.restart_env()
+    self.set_goal_region()
+
+  def step(self, action_index):
+      action = self.actions[action_index]
+      next_vertex = ( (self.curr_node[0] + action[0])%self.length ,  (self.curr_node[1] + action[1])%self.height)
+      neighbors =  list(self.graph.neighbors(self.curr_node))
+      #reward = self.reward(self.curr_node, action)
+      # if  self.curr_node in self.goal_region:
+      #   self.trajectory_reward = 1
+      # else:
+      #   self.trajectory_reward = 0
+
+      if len(self.last_three_steps) == 3:
+        self.last_three_steps = self.last_three_steps[1:] + [self.curr_node]
+      elif len(self.last_three_steps) < 3:
+        self.last_three_steps += [self.curr_node]
+      else:
+        raise ValueError("The last three steps list is larger than 3")
+      
+      rew = 1
+      for node in self.last_three_steps:
+        if node not in self.goal_region:
+          rew = 0
+      self.trajectory_reward = rew
+      ## Dynamics:
+      
+      if next_vertex in neighbors:
+         self.curr_node = next_vertex
+      
+      return self.curr_node, None
+
+
+
 
 
 
@@ -325,7 +440,7 @@ def save_graph_diagnostic_image(env, policy, num_steps, num_paths, title, filena
 
 
   
-  if num_paths == 2:
+  if num_paths <= 2:
     colors_small = ["orange", "purple"]
   if num_paths <= 7:
     color_map = mcolors.BASE_COLORS
