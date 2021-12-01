@@ -29,19 +29,12 @@ from pg_learning import *
 
 
 import IPython
-
-from gridworlds.environments import *
-from gridworlds.policies import *
-from gridworlds.pg_learning import *
-
-
-
 from environments import *
 from environments_color import *
 from policies import *
 
 USE_RAY = True
-ß
+
 ray.init()
 
 
