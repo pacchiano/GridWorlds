@@ -28,6 +28,8 @@ from gridworlds.pg_learning import *
 
 
 from gridworlds.do_undo_maps import *
+from gridworlds.rewards import SimpleIndicatorReward, ManhattanReward
+
 
 ## Test Tabular Policy
 
@@ -38,15 +40,22 @@ success_num_trials = 100
 num_pg_steps = 1000
 stepsize = 1
 trajectory_batch_size = 30
-manhattan_reward = False
 state_representation = "two-dim-encode-goal-location-normalized"
 
 verbose = True
 
 
+reward_function = ManhattanReward()
+
+
 env = GridEnvironment(length, height, 
-	manhattan_reward= manhattan_reward, 
 	state_representation = state_representation)
+
+env.add_reward_function(reward_function)
+
+
+
+
 
 
 

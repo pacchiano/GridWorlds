@@ -38,14 +38,12 @@ success_num_trials = 100
 num_pg_steps = 1000
 stepsize = 1
 trajectory_batch_size = 30
-manhattan_reward = False
 state_representation = "tabular-encode-goal"#"two-dim-encode-goal-location-normalized"
 
 verbose = True
 
 
 env = GridEnvironment(length, height, 
-	manhattan_reward= manhattan_reward, 
 	state_representation = state_representation)
 
 
