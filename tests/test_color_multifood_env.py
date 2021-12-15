@@ -88,7 +88,7 @@ trajectory_batch_size = 30
 
 
 verbose = True
-initialization_type = "near_pit"
+initialization_type = "avoiding_pit"
 
 
 

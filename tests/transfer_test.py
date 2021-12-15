@@ -27,6 +27,8 @@ from gridworlds.policies import *
 from gridworlds.pg_learning import *
 
 
+from gridworlds.do_undo_maps import *
+
 ## Test Tabular Policy
 
 length = 10
@@ -49,14 +51,19 @@ env = GridEnvironment(length, height,
 	manhattan_reward= manhattan_reward, 
 	state_representation = state_representation,
  	location_normalized = location_normalized,
- 	encode_goal = encode_goal, 
- 	sparsity = sparsity)
+ 	encode_goal = encode_goal)
+
+
+
 
 
 state_dim = env.get_state_dim()
 num_actions = env.get_num_actions()
 policy = NNPolicy(state_dim, num_actions)
 
+
+
+#IPython.embed()
 
 base_rewards, base_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
 save_graph_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample paths" , "./tests/figs/initial_sample_paths.png")
@@ -77,20 +84,47 @@ print("PG success num ", pg_success_num)
 print("PG rewards ",pg_rewards )
 
 
+
+
+
 ### Change the linear multiplier for the environment. 
 P = np.arange(state_dim) + 1
-P += torch.normal(torch.zeros((state_dim, state_dim)))
+#P += torch.normal(torch.zeros((state_dim, state_dim)))
 P = P/(1.0*state_dim)
 P = np.diag(P)
 P = torch.tensor(P).float()
-env.add_linear_transformation(P)
+
+
+
+do_undo_map = LinearDoUndoDiscrete(P)
+
+
+env.add_do_undo(do_undo_map)
 
 
 P_rewards, P_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
 
 
+
+
 print("Rewards after P change ", P_rewards)
 print("Successes after P change ", P_success_num)
+
+
+
+policy, training_reward_evolution, training_success_evolution = learn_pg(env, policy, num_pg_steps, 
+	trajectory_batch_size, num_env_steps, verbose = verbose)
+
+
+
+pg_rewards, pg_success_num, optimal_policy_trajectories = test_policy(env, policy, success_num_trials, num_env_steps)
+
+
+
+
+print("PG success num after retraining", pg_success_num)
+print("PG rewards after retraining",pg_rewards )
+
 
 
 
