@@ -39,7 +39,7 @@ num_pg_steps = 1000
 stepsize = 1
 trajectory_batch_size = 30
 manhattan_reward = False
-state_representation = "tabular-encode-goal"#"two-dim-encode-goal-location-normalized"
+state_representation = "two-dim-encode-goal-location-normalized"
 
 verbose = True
 
@@ -79,31 +79,19 @@ print("PG success num ", pg_success_num)
 print("PG rewards ",pg_rewards )
 
 
-
-
-
-### Change the linear multiplier for the environment. 
-P = np.arange(state_dim) + 1
-#P += torch.normal(torch.zeros((state_dim, state_dim)))
-P = P/(1.0*state_dim)
-P = np.diag(P)
-P = torch.tensor(P).float()
-
-
-
-do_undo_map = LinearDoUndoDiscrete(P)
+do_undo_map = ReverseActionsDoUndoDiscrete()
 
 
 env.add_do_undo(do_undo_map)
 
 
-P_rewards, P_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
+reversed_rewards, reversed_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
 
 
 
 
-print("Rewards after P change ", P_rewards)
-print("Successes after P change ", P_success_num)
+print("Rewards after reversed actions change ", reversed_rewards)
+print("Successes after reversed actions change ", reversed_success_num)
 
 
 
