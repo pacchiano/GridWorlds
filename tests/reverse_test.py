@@ -29,7 +29,7 @@ from gridworlds.pg_learning import *
 
 from gridworlds.do_undo_maps import *
 from gridworlds.rewards import SimpleIndicatorReward, ManhattanReward
-
+from gridworlds.rendering_tools import save_grid_diagnostic_image
 
 ## Test Tabular Policy
 

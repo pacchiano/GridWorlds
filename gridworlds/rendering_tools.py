@@ -23,8 +23,15 @@ import IPython
 from matplotlib import colors as colors_matplotlib
 
 
-from .do_undo_maps import IdentityDoUndo
-from .rewards import SimpleIndicatorReward
+from .environments import run_walk
+
+
+def node_list_to_tuples(node_list):
+ return [tuple(node.numpy()) for x in node_list]
+
+def edge_list_to_tuples(edge_list):
+  return [ [tuple(node.numpy()) for node in list(edge)] for edge in edge_list  ]
+
 
 
 def save_grid_diagnostic_image(env, policy, num_steps, num_paths, title, filename):

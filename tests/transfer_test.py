@@ -28,6 +28,8 @@ from gridworlds.pg_learning import *
 
 
 from gridworlds.do_undo_maps import *
+from gridworlds.rendering_tools import save_grid_diagnostic_image
+from gridworlds.rewards import SimpleIndicatorReward, ManhattanReward
 
 ## Test Tabular Policy
 
@@ -35,31 +37,35 @@ length = 10
 height = 10
 num_env_steps = 30
 success_num_trials = 100
-num_pg_steps = 1000
+num_pg_steps = 200
 stepsize = 1
 trajectory_batch_size = 30
 state_representation = "two-dim-encode-goal-location-normalized"
 
 verbose = True
 
+#reward_function = ManhattanReward()
+reward_function = SimpleIndicatorReward()
 
 env = GridEnvironment(length, height, 
 	state_representation = state_representation)
 
+env.add_reward_function(reward_function)
 
 
 
 
 state_dim = env.get_state_dim()
 num_actions = env.get_num_actions()
-policy = NNSoftmaxPolicy(state_dim, num_actions, hidden_layers = [12,20])
+policy = NNSoftmaxPolicy(state_dim, num_actions, 
+	hidden_layers = [50], activation_type = "relu")
 
 
 
 #IPython.embed()
 
 base_rewards, base_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
-save_graph_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample paths" , "./tests/figs/initial_sample_paths.png")
+save_grid_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample paths" , "./tests/figs/initial_sample_paths.png")
 
 
 #optimizer = torch.optim.Adam([policy.policy_params], lr=0.01)

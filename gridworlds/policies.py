@@ -21,7 +21,7 @@ from .environments import run_walk
 
 
 class FeedforwardMultiLayerRepresentation(torch.nn.Module):
-    def __init__(self, input_size, hidden_layers, output_size, activation_type = "sigmoid", 
+    def __init__(self, input_size, hidden_layers, output_size, activation_type = "relu", 
       batch_norm = False, device = torch.device("cpu")):
         super(FeedforwardMultiLayerRepresentation, self).__init__()
         self.input_size = input_size
@@ -53,10 +53,11 @@ class FeedforwardMultiLayerRepresentation(torch.nn.Module):
         self.layers.to(device)
 
         if self.batch_norm:
+            raise ValueError("Not implemented properly yet.")
             self.batch_norms = torch.nn.ModuleList()
             output_sizes = hidden_layers + [output_size]
             for i in range(len(output_sizes)):
-              self.batch_norms.append(torch.nn.BatchNorm1d(self.output_sizes[i]))
+              self.batch_norms.append(torch.nn.BatchNorm1d(output_sizes[i]))
             #self.batch_norms.append(torch.nn.BatchNorm1d(self.hidden_sizes[0]))
             #for i in range(len(self.hidden_sizes)-1):
             #    self.batch_norms.append(torch.nn.BatchNorm1d(self.hidden_sizes[i+1]))
@@ -64,13 +65,15 @@ class FeedforwardMultiLayerRepresentation(torch.nn.Module):
 
     def forward(self, x):
         representation = x
+        
+        #IPython.embed()
+        #raise ValueError("asldkfm")
         for i in range(len(self.layers)):
             representation = self.layers[i](representation)
             if self.batch_norm:
                 representation = self.batch_norms[i](representation)
             if i != len(self.layers)-1:
                 representation = self.activation(representation)
-
         return representation
 
 
@@ -115,10 +118,12 @@ class FeedforwardMultiLayerRepresentation(torch.nn.Module):
 #       batch_norm = False, device = torch.device("cpu")
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_layers=[50]):
+    def __init__(self, state_dim, action_dim, hidden_layers=[50], activation_type = "relu", device = torch.device("cpu")):
         super(PolicyNetwork, self).__init__()
         self.action_dim = action_dim
-        self.network = FeedforwardMultiLayerRepresentation(input_size = state_dim, hidden_layers = hidden_layers, output_size = action_dim )
+        self.network = FeedforwardMultiLayerRepresentation(input_size = state_dim, 
+          hidden_layers = hidden_layers, output_size = action_dim , activation_type = activation_type,
+          device = device)
 
     def forward(self, x, action_indices = None, get_logprob=False):
         logp = self.network(x)
@@ -137,10 +142,12 @@ class PolicyNetwork(nn.Module):
 
 
 class NNSoftmaxPolicy:
-  def __init__(self, state_dim, num_actions, hidden_layers = [50] ):
+  def __init__(self, state_dim, num_actions, hidden_layers = [50], 
+    activation_type = "relu", device = torch.device("cpu")):
     self.num_actions = num_actions
     self.state_dim = state_dim
-    self.network = PolicyNetwork(state_dim, num_actions, hidden_layers = hidden_layers)
+    self.network = PolicyNetwork(state_dim, num_actions, hidden_layers = hidden_layers, 
+      activation_type = "relu", device = torch.device("cpu"))
 
   def log_prob_loss(self, states, action_indices, weights):
     logprob =  self.network(states, action_indices = action_indices, get_logprob = True)
