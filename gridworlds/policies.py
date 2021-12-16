@@ -19,40 +19,106 @@ import IPython
 from .environments import run_walk
 
 
-class MLPNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_size=256):
-        super(MLPNetwork, self).__init__()
-        self.network = nn.Sequential(
-                        nn.Linear(input_dim, hidden_size, bias = False),
-                        nn.ReLU(),
-                        nn.Linear(hidden_size, hidden_size, bias = False),
-                        nn.ReLU(),
 
-                        # nn.Linear(hidden_size, hidden_size),
-                        # nn.ReLU(),
-                        # nn.Linear(hidden_size, hidden_size),
-                        # nn.ReLU(),
-                        nn.Linear(hidden_size, output_dim, bias = False),
-                        )
+class FeedforwardMultiLayerRepresentation(torch.nn.Module):
+    def __init__(self, input_size, hidden_layers, output_size, activation_type = "sigmoid", 
+      batch_norm = False, device = torch.device("cpu")):
+        super(FeedforwardMultiLayerRepresentation, self).__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+        self.batch_norm = batch_norm
+        self.sigmoid = torch.nn.Sigmoid()
+        self.hidden_layers = hidden_layers
+        if activation_type == "sigmoid":
+            self.activation = torch.nn.Sigmoid()
+        elif activation_type == "relu":
+            self.activation = torch.nn.ReLU()
+        elif activation_type == "leaky_relu":
+            self.activation = torch.nn.LeakyReLU()
+        else:
+            raise ValueError("Unrecognized activation type.")
+
+        self.layers = torch.nn.ModuleList()
+        
+        sizes = [input_size] + hidden_layers + [output_size]
+
+        for i in range(len(sizes)-1):
+          self.layers = self.layers.append(torch.nn.Linear(sizes[i], sizes[i+1]))
+
+        # self.layers = self.layers.append(torch.nn.Linear(self.input_size, self.hidden_sizes[0]))
+
+        # for i in range(len(self.hidden_sizes)-1):
+        #     self.layers.append(torch.nn.Linear(self.hidden_sizes[i], self.hidden_sizes[i+1]))
+
+        self.layers.to(device)
+
+        if self.batch_norm:
+            self.batch_norms = torch.nn.ModuleList()
+            output_sizes = hidden_layers + [output_size]
+            for i in range(len(output_sizes)):
+              self.batch_norms.append(torch.nn.BatchNorm1d(self.output_sizes[i]))
+            #self.batch_norms.append(torch.nn.BatchNorm1d(self.hidden_sizes[0]))
+            #for i in range(len(self.hidden_sizes)-1):
+            #    self.batch_norms.append(torch.nn.BatchNorm1d(self.hidden_sizes[i+1]))
+            self.batch_norms.to(device)
+
+    def forward(self, x):
+        representation = x
+        for i in range(len(self.layers)):
+            representation = self.layers[i](representation)
+            if self.batch_norm:
+                representation = self.batch_norms[i](representation)
+            if i != len(self.layers)-1:
+                representation = self.activation(representation)
+
+        return representation
+
+
+
+
+
+
+
+
+
+
+# class MLPNetwork(nn.Module):
+#     def __init__(self, input_dim, output_dim, hidden_size=256):
+#         super(MLPNetwork, self).__init__()
+#         self.network = nn.Sequential(
+#                         nn.Linear(input_dim, hidden_size, bias = False),
+#                         nn.ReLU(),
+#                         nn.Linear(hidden_size, hidden_size, bias = False),
+#                         nn.ReLU(),
+
+#                         # nn.Linear(hidden_size, hidden_size),
+#                         # nn.ReLU(),
+#                         # nn.Linear(hidden_size, hidden_size),
+#                         # nn.ReLU(),
+#                         nn.Linear(hidden_size, output_dim, bias = False),
+#                         )
     
-    def forward(self, x):
-        return self.network(x)
+#     def forward(self, x):
+#         return self.network(x)
 
-class LinearNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(LinearNetwork, self).__init__()
-        self.network = nn.Linear(input_dim, output_dim)
+# class LinearNetwork(nn.Module):
+#     def __init__(self, input_dim, output_dim):
+#         super(LinearNetwork, self).__init__()
+#         self.network = nn.Linear(input_dim, output_dim)
                            
-    def forward(self, x):
-        return self.network(x)
+#     def forward(self, x):
+#         return self.network(x)
 
+
+
+# self, input_size, hidden_sizes, activation_type = "sigmoid", 
+#       batch_norm = False, device = torch.device("cpu")
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_size=50):
+    def __init__(self, state_dim, action_dim, hidden_layers=[50]):
         super(PolicyNetwork, self).__init__()
         self.action_dim = action_dim
-
-        self.network = MLPNetwork(state_dim, action_dim , hidden_size)
+        self.network = FeedforwardMultiLayerRepresentation(input_size = state_dim, hidden_layers = hidden_layers, output_size = action_dim )
 
     def forward(self, x, action_indices = None, get_logprob=False):
         logp = self.network(x)
@@ -64,14 +130,17 @@ class PolicyNetwork(nn.Module):
         return action
 
 
-class NNPolicy:
-  def __init__(self, state_dim, num_actions, softmax= True, max_policy_param_absval =100, hidden_layer = 50 ):
+
+
+
+
+
+
+class NNSoftmaxPolicy:
+  def __init__(self, state_dim, num_actions, hidden_layers = [50] ):
     self.num_actions = num_actions
-    self.max_policy_param_absval = max_policy_param_absval
     self.state_dim = state_dim
-    if not softmax:
-      raise ValueError("Not implemented")    
-    self.network = PolicyNetwork(state_dim, num_actions, hidden_size = hidden_layer)
+    self.network = PolicyNetwork(state_dim, num_actions, hidden_layers = hidden_layers)
 
   def log_prob_loss(self, states, action_indices, weights):
     logprob =  self.network(states, action_indices = action_indices, get_logprob = True)
@@ -109,7 +178,6 @@ def test_policy(env, policy, num_trials, num_env_steps):
   base_success_nums = []
   collected_base_rewards = []
   trajectories = []
-
 
   for i in range(num_trials):
     env.restart_env()

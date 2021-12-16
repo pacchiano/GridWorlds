@@ -38,7 +38,7 @@ success_num_trials = 100
 num_pg_steps = 1000
 stepsize = 1
 trajectory_batch_size = 30
-state_representation = "tabular-encode-goal"#"two-dim-encode-goal-location-normalized"
+state_representation = "two-dim-encode-goal-location-normalized"
 
 verbose = True
 
@@ -52,7 +52,7 @@ env = GridEnvironment(length, height,
 
 state_dim = env.get_state_dim()
 num_actions = env.get_num_actions()
-policy = NNPolicy(state_dim, num_actions)
+policy = NNSoftmaxPolicy(state_dim, num_actions, hidden_layers = [12,20])
 
 
 

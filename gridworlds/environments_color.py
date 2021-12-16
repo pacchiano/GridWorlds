@@ -65,7 +65,8 @@ class ColorGridEnvironment(GridEnvironment):
 							state_representation = "overwritten",
 							sparsity = sparsity,
 							combine_with_sparse =combine_with_sparse,
-							reversed_actions = reversed_actions)
+							reversed_actions = reversed_actions,
+							return_state_info = True)
 
 		self.name = "ColorSimple"
 		self.placeholder_color_prob = placeholder_color_prob
@@ -271,8 +272,6 @@ class ColorGridEnvironmentMultifood(ColorGridEnvironment):
 
 
 
-
-
 	def set_pit_nodes(self):
 		self.pit_nodes = []
 		self.pit_adjacent_nodes = []
@@ -420,7 +419,6 @@ class ColorGridEnvironmentMultifood(ColorGridEnvironment):
 				raise ValueError("Food source is in a pit node")
 
 	def remove_and_reset_one_food_source(self, food_source_node):
-		
 		self.food_sources.remove(food_source_node)
 		if len(self.food_sources) != self.num_food_sources-1:
 			raise ValueError("Num food sources after removal inconsistent.")
@@ -544,7 +542,12 @@ class ColorGridEnvironmentMultifood(ColorGridEnvironment):
 			 self.curr_node = next_vertex
 		
 
-		return self.curr_node, reward
+		state_info = dict([])
+		state_info['curr_node'] = self.curr_node
+		state_info['reward'] = reward
+
+		return state_info
+		#return self.curr_node, reward
 
 	def reward(self, node, action):
 		if node in self.food_sources:
@@ -587,7 +590,9 @@ def run_color_walk(env, policy, max_time = 1000):
 		states_info.append((env.get_state(), is_placeholder_color))
 
 		old_vertex = env.curr_node
-		_, r = env.step(action_index)
+		step_info = env.step(action_index)
+		
+		r = step_info["reward"]
 		action_indices.append(action_index)
 		edge_path.append(torch.from_numpy(np.array((old_vertex, env.curr_node))).to(DEVICE))
 		#node_path.append(env.curr_node)
@@ -615,6 +620,7 @@ def run_color_walk(env, policy, max_time = 1000):
 
 
 def save_color_graph_diagnostic_image(env, color_map, title, filename):
+	raise ValueError("The save_color_graph_diagnostic_image function has been deprecated. Use save_color_grid_diagnostic_image instead")
 	directed_graph= env.graph.to_directed()
 	pos = nx.spectral_layout(env.graph)
 	draw(directed_graph, pos = pos,  node_size =10, arrows= False)

@@ -64,40 +64,38 @@ plt.savefig("./tests/figs/test_env.png")
 plt.clf()
 
 
-env.sparsify_graph(.05)
-directed_graph= env.graph.to_directed()
-pos = nx.spectral_layout(env.graph)
-draw(directed_graph, pos = pos,  node_size =10, arrows= False)
-nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.initial_node], node_size=40, node_color = "red")
-nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.destination_node], node_size=40, node_color = "black")
-plt.savefig("./tests/figs/test_env_sparsify.png")
+# env.sparsify_graph(.05)
+# directed_graph= env.graph.to_directed()
+# pos = nx.spectral_layout(env.graph)
+# draw(directed_graph, pos = pos,  node_size =10, arrows= False)
+# nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.initial_node], node_size=40, node_color = "red")
+# nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.destination_node], node_size=40, node_color = "black")
+# plt.savefig("./tests/figs/test_env_sparsify.png")
+
+# plt.clf()
 
 
 
-plt.clf()
-
-
-
-env.restore_initial_graph()
-directed_graph= env.graph.to_directed()
-pos = nx.spectral_layout(env.graph)
-draw(directed_graph, pos = pos,  node_size =10, arrows= False)
-nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.initial_node], node_size=40, node_color = "red")
-nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.destination_node], node_size=40, node_color = "black")
-plt.savefig("./tests/figs/test_restore_graph.png")
+# env.restore_initial_graph()
+# directed_graph= env.graph.to_directed()
+# pos = nx.spectral_layout(env.graph)
+# draw(directed_graph, pos = pos,  node_size =10, arrows= False)
+# nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.initial_node], node_size=40, node_color = "red")
+# nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.destination_node], node_size=40, node_color = "black")
+# plt.savefig("./tests/figs/test_restore_graph.png")
 
 
 
 
-plt.clf()
+# plt.clf()
 
-env.remove_random_edge()
+# env.remove_random_edge()
 
-directed_graph= env.graph.to_directed()
-pos = nx.spectral_layout(env.graph)
-draw(directed_graph, pos = pos,  node_size =10, arrows= False)
-nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.initial_node], node_size=40, node_color = "red")
-nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.destination_node], node_size=40, node_color = "black")
-plt.savefig("./tests/figs/remove_random_edge_graph.png")
+# directed_graph= env.graph.to_directed()
+# pos = nx.spectral_layout(env.graph)
+# draw(directed_graph, pos = pos,  node_size =10, arrows= False)
+# nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.initial_node], node_size=40, node_color = "red")
+# nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.destination_node], node_size=40, node_color = "black")
+# plt.savefig("./tests/figs/remove_random_edge_graph.png")
 
 

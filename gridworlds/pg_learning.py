@@ -16,9 +16,11 @@ import torch
 import IPython
 from .environments import run_walk
 
-def learn_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, verbose = False, supress_training_curve = True, 
-	logging_frequency = None, reset_env = True, trajectory_feedback = False):
-	#optimizer = torch.optim.Adam([policy.policy_params], lr=0.01)
+def learn_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, 
+	verbose = False, supress_training_curve = True, 
+	logging_frequency = None, reset_env = True, 
+	trajectory_feedback = False):
+	
 	if logging_frequency == None:
 		logging_frequency = num_pg_steps
 	optimizer = torch.optim.Adam(policy.network.parameters(), lr = 0.01)
@@ -27,8 +29,6 @@ def learn_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, ve
 	training_reward_evolution = []
 
 	for i in range(num_pg_steps):
-		# if verbose:
-		# 	print(i)
 		pg_data_list = []
 		baseline = 0
 		states = []
@@ -44,10 +44,7 @@ def learn_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, ve
 				env.reset_initial_and_destination(hard_instances = True)
 			
 			node_path1, edge_path1,states1, action_indices1, rewards1  = run_walk(env, policy, num_env_steps)
-			#IPython.embed()
-			# raise ValueError("asdflkm")
 			if trajectory_feedback:
-				#trajectory_feedback = env.trajectory_reward
 
 				trajectory_reward = env.trajectory_reward
 				rewards_per_batch += trajectory_reward*1.0

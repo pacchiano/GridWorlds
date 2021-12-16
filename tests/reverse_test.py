@@ -37,7 +37,7 @@ length = 10
 height = 10
 num_env_steps = 30
 success_num_trials = 100
-num_pg_steps = 1000
+num_pg_steps = 700
 stepsize = 1
 trajectory_batch_size = 30
 state_representation = "two-dim-encode-goal-location-normalized"
@@ -46,6 +46,7 @@ verbose = True
 
 
 reward_function = ManhattanReward()
+reward_function = SimpleIndicatorReward()
 
 
 env = GridEnvironment(length, height, 
@@ -58,19 +59,15 @@ env.add_reward_function(reward_function)
 
 
 
-
-
-
 state_dim = env.get_state_dim()
 num_actions = env.get_num_actions()
-policy = NNPolicy(state_dim, num_actions)
+policy = NNSoftmaxPolicy(state_dim, num_actions,  hidden_layers = [12,20])
 
 
-
-#IPython.embed()
 
 base_rewards, base_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
-save_graph_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample paths" , "./tests/figs/initial_sample_paths.png")
+save_grid_diagnostic_image( env, policy, num_env_steps, 
+	10,"Initial sample paths" , "./tests/figs/reverse_initial_sample_paths.png")
 
 
 #optimizer = torch.optim.Adam([policy.policy_params], lr=0.01)
@@ -78,7 +75,8 @@ save_graph_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample path
 policy, training_reward_evolution, training_success_evolution = learn_pg(env, policy, num_pg_steps, 
 	trajectory_batch_size, num_env_steps, verbose = verbose)
 
-pg_rewards, pg_success_num, optimal_policy_trajectories = test_policy(env, policy, success_num_trials, num_env_steps)
+pg_rewards, pg_success_num, optimal_policy_trajectories = test_policy(env, policy, 
+	success_num_trials, num_env_steps)
 
 
 #print("Sum policy params after PG ", torch.sum(policy.policy_params))
@@ -88,14 +86,20 @@ print("PG success num ", pg_success_num)
 print("PG rewards ",pg_rewards )
 
 
+
+save_grid_diagnostic_image( env, policy, num_env_steps, 
+	10,"After PG sample paths" , "./tests/figs/reverse_afterPG_sample_paths.png")
+
+
 do_undo_map = ReverseActionsDoUndoDiscrete()
-
-
 env.add_do_undo(do_undo_map)
 
+IPython.embed()
+reversed_rewards, reversed_success_num, _ = test_policy(env, policy, 
+	success_num_trials, num_env_steps)
 
-reversed_rewards, reversed_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
-
+save_grid_diagnostic_image( env, policy, num_env_steps, 
+	10,"After reverse sample paths" , "./tests/figs/reverse_reversed_sample_paths.png")
 
 
 
@@ -109,13 +113,17 @@ policy, training_reward_evolution, training_success_evolution = learn_pg(env, po
 
 
 
-pg_rewards, pg_success_num, optimal_policy_trajectories = test_policy(env, policy, success_num_trials, num_env_steps)
+pg_rewards, pg_success_num, optimal_policy_trajectories = test_policy(env, policy, 
+	success_num_trials, num_env_steps)
 
 
 
 
 print("PG success num after retraining", pg_success_num)
 print("PG rewards after retraining",pg_rewards )
+
+save_grid_diagnostic_image( env, policy, num_env_steps, 
+	10,"After reverse sample paths" , "./tests/figs/reverse_afterPGreversed_sample_paths.png")
 
 
 
