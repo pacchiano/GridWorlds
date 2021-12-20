@@ -39,21 +39,22 @@ class OptimalColorPolicy():
 	def get_action(self, state, with_info = False):
 		color_indicator = state.cpu().numpy()
 		color_index = int(np.sum((color_indicator > 0)*np.arange(self.env.get_state_dim())))
-		if color_index < self.env.num_colors:
-			return self.env.color_action_map[color_index]
+		if color_index < self.env.num_fixed_colors:
+			return self.env.fixed_color_action_map[color_index]
 		else:
-			return self.env.placeholder_action_map[color_index - self.env.num_colors]
+			return self.env.placeholder_action_map[color_index - self.env.num_fixed_colors]
 
 
 
 
-class ColorPolicy(NNPolicy):
-	def __init__(self, string_with_placeholders, state_dim, num_actions, reactive = False, softmax = True, max_policy_param_absval = 100, hidden_layer = 50):
+class ColorPolicy(NNSoftmaxPolicy):
+	def __init__(self, string_with_placeholders, state_dim, num_actions, reactive = False, 
+		activation_type = "softmax", hidden_layers = [50], device = torch.device("cpu")):
 		
 		self.string_with_placeholders = string_with_placeholders
 		self.reactive = reactive
-		# self.color_indicator_dimensions_in_state = color_indicator_dimensions
-		super().__init__(state_dim, num_actions, softmax= softmax, max_policy_param_absval =max_policy_param_absval, hidden_layer = hidden_layer)
+
+		super().__init__(state_dim, num_actions, hidden_layers = [50], activation_type = activation_type, device =  device)
 
 
 

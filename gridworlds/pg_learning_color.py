@@ -35,7 +35,7 @@ def learn_color_pg(env, color_policy, num_pg_steps, trajectory_batch_size, num_e
 		logging_frequency = num_pg_steps
 
 
-	is_cuda = next(color_policy.network.network.network.parameters()).is_cuda
+	is_cuda = next(color_policy.network.parameters()).is_cuda
 	# IPython.embed()
 	# raise ValueError("asdflkm")
 	print("Using CUDA ", is_cuda)

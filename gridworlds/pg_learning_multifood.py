@@ -26,20 +26,15 @@ from copy import deepcopy
 
 from .policies import *
 from .environments import *
-from .environments_color import *
-from .environments_smell import *
 
-def learn_multifood_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, multifood = False, verbose = False, 
+def learn_multifood_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, 
+	multifood = False, verbose = False, 
 	supress_training_curve = True, logging_frequency = None, reset_env = True):
 	#optimizer = torch.optim.Adam([policy.policy_params], lr=0.01)
 	if logging_frequency == None:
 		logging_frequency = num_pg_steps
 
 
-	is_cuda = next(policy.network.network.network.parameters()).is_cuda
-	# IPython.embed()
-	# raise ValueError("asdflkm")
-	print("Using CUDA ", is_cuda)
 
 	optimizer = torch.optim.Adam(policy.network.parameters(), lr = 0.01)
 

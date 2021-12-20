@@ -39,10 +39,6 @@ sys.path.append('./')
 from gridworlds.environments import *
 from gridworlds.policies import *
 from gridworlds.pg_learning import *
-from gridworlds.environments_color import *
-from gridworlds.policies_color import *
-from gridworlds.pg_learning_color import *
-from gridworlds.environments_smell import *
 from gridworlds.pg_learning_multifood import *
 from gridworlds.rendering_tools import *
 
@@ -84,8 +80,8 @@ env_pit_multifood = GridEnvironmentPitMultifood(
 		pit_type = "central",
 		initialization_type = "avoiding_pit",
 		num_food_sources = num_food_sources,
-		length_rim = 5,
-		height_rim = 5
+		length_rim = 20,
+		height_rim = 20
 		)
 
 
@@ -112,27 +108,28 @@ policy = OptimalMultifoodPitPolicy(env_pit_multifood)
 # policy = RandomPolicy()
 
 
-diagnostic_images_filenames = []
+# diagnostic_images_filenames = []
 
 
-for i in range(15):
-	diagnostic_image_file = "{}/optimal_policy_paths_pit_multifood_trial_{}.png".format(base_dir, i+1)
-	diagnostic_images_filenames.append(diagnostic_image_file)
-	save_grid_diagnostic_image(env_pit_multifood, policy, num_env_steps, 1, 
-		"Trained Policy Multifood", 
-		diagnostic_image_file)
+# for i in range(15):
+# 	diagnostic_image_file = "{}/optimal_policy_paths_pit_multifood_trial_{}.png".format(base_dir, i+1)
+# 	diagnostic_images_filenames.append(diagnostic_image_file)
+# 	save_grid_diagnostic_image(env_pit_multifood, policy, num_env_steps, 1, 
+# 		"Trained Policy Multifood", 
+# 		diagnostic_image_file)
 
-	#env_pit_multifood.restart_env()
-	env_pit_multifood.start_day()
-
-
+# 	#env_pit_multifood.restart_env()
+# 	env_pit_multifood.start_day()
 
 
+save_gif_diagnostic_image(env_pit_multifood, policy, num_env_steps, 1, 
+	"Optimal Policy PitMultifood", "{}/optimal_policy_paths_pit_multifood_trial".format(base_dir), 15)
 
-images = []
-for filename in diagnostic_images_filenames:
-    images.append(imageio.imread(filename))
-imageio.mimsave('{}/movie.gif'.format(base_dir), images)
+
+# images = []
+# for filename in diagnostic_images_filenames:
+#     images.append(imageio.imread(filename))
+# imageio.mimsave('{}/movie.gif'.format(base_dir), images)
 
 
 

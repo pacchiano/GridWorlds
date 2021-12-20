@@ -58,3 +58,40 @@ class ManhattanReward(RewardFunction):
 
 	def evaluate_trajectory(self, env):
 		raise ValueError("Not implemented evaluate_trajectory for ManhattanReward")
+
+
+
+class MultifoodIndicatorReward(RewardFunction):
+
+	def evaluate(self, env, reward_info):
+	    if env.get_curr_node() in env.food_sources:
+	     	return 1
+	    
+	    return 0
+
+	def evaluate_trajectory(self, env):
+		raise ValueError("Not implemented evaluate_trajectory for ManhattanReward")
+
+
+
+
+class MultifoodProximateReward(RewardFunction):
+
+	def evaluate(self, env, reward_info):
+
+		distances = [np.abs(a-env.curr_node[0]) + np.abs(b-env.curr_node[1]) for (a,b) in env.food_sources]
+
+		normalization_factor = (env.get_length() + env.get_height())*1.0
+
+		return -np.min(distances)/normalization_factor
+
+
+	def evaluate_trajectory(self, env):
+		raise ValueError("Not implemented evaluate_trajectory for ManhattanReward")
+
+
+
+
+
+
+

@@ -38,10 +38,10 @@ sys.path.append('./')
 from gridworlds.environments import *
 from gridworlds.policies import *
 from gridworlds.pg_learning import *
-from gridworlds.environments_color import *
-from gridworlds.policies_color import *
-from gridworlds.pg_learning_color import *
-from gridworlds.environments_smell import *
+#from gridworlds.environments_color import *
+#from gridworlds.policies_color import *
+#from gridworlds.pg_learning_color import *
+#from gridworlds.environments_smell import *
 from gridworlds.pg_learning_multifood import *
 from gridworlds.rendering_tools import *
 
@@ -81,7 +81,7 @@ env_pit = GridEnvironmentPit(
 		state_representation = state_representation,
 		pit_type = "central",
 		initialization_type = "avoiding_pit",
-		length_rim = 2,
+		length_rim = 3,
 		height_rim = 2
 		)
 
@@ -104,16 +104,35 @@ policy, training_reward_evolution_pit, training_success_evolution_pit = learn_pg
 env_pit.reset_initial_and_destination(hard_instances = True)
 
 
+# for i in range(15):
+# 	save_grid_diagnostic_image(env_pit, policy, num_env_steps, 1, 
+# 		"Trained Policy Multifood", 
+# 		"{}/learned_policy_paths_pit_trial_{}.png".format(base_dir, i+1))
+# 	env_pit.reset_environment()
+
+
+
+save_gif_diagnostic_image(env_pit, policy, num_env_steps, 1, 
+	"Trained Policy Pit", "{}/learned_policy_paths_pit_trial".format(base_dir), 15)
+
+
+
 policy = OptimalMultifoodPitPolicy(env_pit)
 
-#policy = RandomPolicy()
 
 
-for i in range(15):
-	save_grid_diagnostic_image(env_pit, policy, num_env_steps, 1, 
-		"Trained Policy Multifood", 
-		"{}/learned_policy_paths_pit_trial_{}.png".format(base_dir, i+1))
-	env_pit.reset_environment()
+
+
+# for i in range(15):
+# 	save_grid_diagnostic_image(env_pit, policy, num_env_steps, 1, 
+# 		"Trained Policy Multifood", 
+# 		"{}/optimal_policy_paths_pit_trial_{}.png".format(base_dir, i+1))
+# 	env_pit.reset_environment()
+
+
+save_gif_diagnostic_image(env_pit, policy, num_env_steps, 1, 
+	"Trained Policy Pit", "{}/optimal_policy_paths_pit_trial".format(base_dir), 15)
+
 
 IPython.embed()
 

@@ -134,3 +134,55 @@ def save_graph_diagnostic_image(env, policy, num_steps, num_paths, title, filena
   plt.close("all")
 
 
+
+
+def save_color_graph_diagnostic_image(env, color_map, title, filename):
+  raise ValueError("The save_color_graph_diagnostic_image function has been deprecated. Use save_color_grid_diagnostic_image instead")
+  directed_graph= env.graph.to_directed()
+  pos = nx.spectral_layout(env.graph)
+  draw(directed_graph, pos = pos,  node_size =10, arrows= False)
+
+
+  node_lists_map = dict([])
+  
+  for i in range(color_map.shape[0]):
+    for j in range(color_map.shape[1]):
+      if color_map[i,j] not in node_lists_map.keys():
+        node_lists_map[color_map[i,j]] = [(i,j)]
+      else:
+        node_lists_map[color_map[i,j]].append((i,j))
+  num_colors_with_placeholders = len(node_lists_map.keys())
+
+  #colors = ["orange", "purple"]
+  if num_colors_with_placeholders <= 7:
+    color_map = mcolors.BASE_COLORS
+  elif num_colors_with_placeholders <= 10:
+    color_map = mcolors.TABLEAU_COLORS
+  else:
+    color_map = mcolors.CSS4_COLORS
+  colors = list(color_map.keys())
+  if num_colors_with_placeholders > len(colors):
+    raise ValueError("Too many num_colors_with_placeholders, I don't have enough colors")
+
+
+  for i in range(len(node_lists_map.keys())):
+     
+    nx.draw_networkx_nodes(directed_graph, pos = pos, nodelist = node_lists_map[list(node_lists_map.keys())[i]], node_size = 20, node_color = colors[i])
+
+
+  nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.initial_node], node_size=70, node_color = "blue")
+  if env.destination_node == None:
+    nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=env.food_sources, node_size=70, node_color = "black")
+    if len(env.pit_nodes) > 0:
+        nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=env.pit_nodes, node_size=70, node_color = "red")
+
+  else:
+    nx.draw_networkx_nodes(directed_graph, pos = pos,nodelist=[env.destination_node], node_size=70, node_color = "black")
+
+  plt.title(title)
+  plt.savefig(filename)
+  plt.close("all")
+
+
+
+

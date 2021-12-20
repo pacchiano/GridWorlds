@@ -13,18 +13,26 @@ import tempfile
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy.random as npr
-from networkx import grid_graph, single_target_shortest_path_length, draw, spring_layout, draw_planar, grid_2d_graph, draw_shell, draw_spring, draw_spectral
+from networkx import grid_graph, single_target_shortest_path_length, draw, spring_layout, draw_planar, grid_2d_graph, draw_shell, draw_spring, draw_spectral, shortest_path_length
 from networkx.algorithms.components import is_connected
 import random
 import networkx as nx
 import copy
 import IPython
 #%matplotlib inline
+import itertools
+from copy import deepcopy
 from matplotlib import colors as colors_matplotlib
 
 
 from .do_undo_maps import IdentityDoUndo
-from .rewards import SimpleIndicatorReward
+from .rewards import SimpleIndicatorReward, MultifoodIndicatorReward
+
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+DEVICE = torch.device("cpu") 
+
+
 
 
 def get_grid_graph(length, height):
@@ -32,11 +40,6 @@ def get_grid_graph(length, height):
   return graph
 
 
-def node_list_to_tuples(node_list):
- return [tuple(node.numpy()) for x in node_list]
-
-def edge_list_to_tuples(edge_list):
-  return [ [tuple(node.numpy()) for node in list(edge)] for edge in edge_list  ]
 
 ## This class implements a simple grid environment that consists of a 
 ## grid derived graph and with features equal to the grid locations.
@@ -46,13 +49,12 @@ def edge_list_to_tuples(edge_list):
 ### Parameter desciptions.
 ### length (int) = GridEnvironment length
 ### height (int) = GridEnvironment height
-### manhattan_reward (boolean) = If True the reward equals the negative manhattan distance between the current location and the goal.
 ### state_representation (string) = This parameter can take the form of either  "two-dim" or "tabular". In the first case the native state 
 ###                                 representation simply takes the form of a two dimensional location tuple. 
 ###                                 "two-dim", "tabular", "overwritten",
 ###                                 "two-dim-location-normalized", "two-dim-encode-goal-location-normalized", "two-dim-encode-goal",
 ###                                 "tabular-encode-goal"]
-
+### 
 class GridEnvironment:
   def __init__(self,  
               length, 
@@ -90,17 +92,38 @@ class GridEnvironment:
     self.length = length
     self.height = height
 
-    ### Perhpas change the initial and destination nodes. Consider making these fields private.
-    self.initial_node = random.choice(list(self.graph.nodes))
-    self.destination_node = random.choice(list(self.graph.nodes))
-    
-    self.curr_node = self.initial_node
-    self.end = False
-    self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
-
     self.do_undo_map = do_undo_map
 
 
+    ### Perhpas change the initial and destination nodes. Consider making these fields private.
+    self.valid_initial_nodes = list(self.graph.nodes)
+    self.valid_destination_nodes = list(self.graph.nodes)
+
+
+    if state_representation != "overwritten":
+      self.reset_environment()
+
+
+
+
+    # self.initial_node = random.choice(list(self.graph.nodes))
+    # self.destination_node = random.choice(list(self.graph.nodes))
+    
+    # self.curr_node = self.initial_node
+    # self.end = False
+    # self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
+
+
+
+
+
+
+
+  def add_do_undo(self, do_undo_map):
+    self.do_undo_map = do_undo_map
+
+  def add_reward_function(self, reward_function):
+    self.reward_function = reward_function
 
   def get_curr_node(self):
     return self.curr_node
@@ -111,49 +134,76 @@ class GridEnvironment:
   def get_height(self):
     return self.height
 
+
+  def get_initial_destination_states(self):
+    initial_state = self.get_state_helper(self.initial_node)
+    destination_state = self.get_state_helper(self.destination_node)
+    return dict([('initial_state', initial_state), ("destination_state", destination_state)])
+
+
+
+
+
   def get_length(self):
     return self.length
 
-  def reset_transformation(self):
-    self.do_undo_map = IdentityDoUndo()
-
-
-  def add_do_undo(self, do_undo_map):
-    self.do_undo_map = do_undo_map
-
-  def add_reward_function(self, reward_function):
-    self.reward_function = reward_function
-
-  def reset_initial(self, hard_instances):
-    self.initial_node = random.choice(list(self.graph.nodes))
-    #self.destination_node = random.choice(list(self.graph.nodes))
-    if hard_instances:
-      while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/3:
-        self.initial_node = random.choice(list(self.graph.nodes))
-        #self.destination_node = random.choice(list(self.graph.nodes))
-    self.restart_env()
-
-
-  def reset_initial_and_destination(self, hard_instances):
-    self.initial_node = random.choice(list(self.graph.nodes))
-    destination_node = random.choice(list(self.graph.nodes))
-    if hard_instances:
-      while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/3:
-        self.initial_node = random.choice(list(self.graph.nodes))
-        destination_node = random.choice(list(self.graph.nodes))
-    
-    #self.destination_node = destination_node
-    self.set_destination_node(destination_node)
-    self.restart_env()
-
   def get_name(self):
     return "{}_{}".format(self.length, self.height)
-  
 
-  def restart_env(self):
-    self.curr_node = self.initial_node 
-    self.end = False
-  
+
+  def get_next_vertex(self, i,j, action_index):
+    action = self.actions[action_index]
+
+    next_vertex_0 = i+action[0]
+    next_vertex_0 = max(0, next_vertex_0)
+    next_vertex_0 = min(next_vertex_0, self.length-1)
+
+    next_vertex_1 = j+action[1]
+    next_vertex_1 = max(0, next_vertex_1)
+    next_vertex_1 = min(next_vertex_1, self.height-1)
+
+    next_vertex = (next_vertex_0, next_vertex_1)
+
+    return next_vertex
+
+
+  def get_num_actions(self):
+    return len(self.actions)
+
+
+
+  def get_optimal_action_and_index(self, vertex):
+    return get_optimal_action_and_index_single_destination(vertex, self.destination_node, self.graph)[0]
+
+
+  def get_optimal_action_and_index_single_destination(self, vertex, destination_node, graph ):
+      (i,j) = vertex
+      optimal_action_index = 0
+      min_distance  = float("inf")
+      dist = float("inf")
+      shortest_paths_map = dict(single_target_shortest_path_length(graph, destination_node))
+
+      for l in range(len(self.actions)):
+          action = self.actions[l]              
+
+          next_vertex = self.get_next_vertex(i,j, l)
+
+          #next_vertex = ( (i + action[0])%self.length ,  (j + action[1])%self.height)
+          if next_vertex in list(graph.neighbors((i,j))):
+            dist = shortest_paths_map[next_vertex]
+
+            #dist = np.abs(next_vertex[0]-food_source[0]) + np.abs(next_vertex[1] - food_source[1])
+          if dist < min_distance:
+              optimal_action_index  =  l
+              min_distance = dist
+      return optimal_action_index, self.actions[optimal_action_index]
+
+
+
+  ### OUTPUTS the current state as a pytorch tensor.
+  def get_state(self):    
+    return self.get_state_helper(self.curr_node)
+
   def get_state_dim(self):
     if "tabular" in self.state_representation:
       return self.height*self.length
@@ -165,19 +215,7 @@ class GridEnvironment:
     else:
       raise ValueError("State representation not available - {}".format(self.state_representation))
 
-  def get_num_actions(self):
-    return 4
 
-
-  ### OUTPUTS the current state as a pytorch tensor.
-  def get_state(self):    
-    return self.get_state_helper(self.curr_node)
-
-
-  def get_initial_destination_states(self):
-    initial_state = self.get_state_helper(self.initial_node)
-    destination_state = self.get_state_helper(self.destination_node)
-    return dict([('initial_state', initial_state), ("destination_state", destination_state)])
 
   def get_state_helper(self, curr_node):
     if "tabular" in self.state_representation:
@@ -197,6 +235,41 @@ class GridEnvironment:
 
 
     return self.do_undo_map.do_state(state.flatten())
+
+  def reset_environment(self, info = dict([("hard_instances", True)])):
+    self.reset_initial_and_destination(info["hard_instances"])
+
+
+
+  def reset_initial_and_destination(self, hard_instances):
+    self.initial_node = random.choice(self.valid_initial_nodes)
+
+    self.destination_node = random.choice([node for node in self.valid_destination_nodes if node  != self.initial_node])
+    if hard_instances:
+      while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/3:
+        self.initial_node = random.choice(self.valid_initial_nodes)
+        self.destination_node = random.choice([node for node in self.valid_destination_nodes if node  != self.initial_node])
+    
+    #self.destination_node = destination_node
+    self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
+    self.restart_env()
+
+
+
+  def reset_transformation(self):
+    self.do_undo_map = IdentityDoUndo()
+
+  
+  ### restarts the environment
+  def restart_env(self):
+    self.curr_node = self.initial_node 
+    self.end = False
+  
+
+  ### Sets the self.initial_node to initial_node
+  def set_initial_node(self, initial_node):
+    self.initial_node = initial_node
+    self.restart_env()
 
       
   ### Takes an action and returns the next state and reward value.
@@ -246,125 +319,284 @@ class GridEnvironment:
 
     return step_info
 
-  def get_next_vertex(self, i,j, action_index):
-    action = self.actions[action_index]
-
-    next_vertex_0 = i+action[0]
-    next_vertex_0 = max(0, next_vertex_0)
-    next_vertex_0 = min(next_vertex_0, self.length-1)
-
-    next_vertex_1 = j+action[1]
-    next_vertex_1 = max(0, next_vertex_1)
-    next_vertex_1 = min(next_vertex_1, self.height-1)
-
-    next_vertex = (next_vertex_0, next_vertex_1)
-
-    return next_vertex
-
-
-
-  ### Sets the self.initial_node to initial_node
-  def set_initial_node(self, initial_node):
-    self.initial_node = initial_node
-    self.restart_env()
-
-  ### Sets the self.destination_node to destination_node  
-  def set_destination_node(self, destination_node):
-    self.destination_node = destination_node
-    self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
-    self.restart_env()
 
 
 
 
 
-class GridEnvironmentNonMarkovian(GridEnvironment):
+
+
+
+## This class implements a simple grid environment that consists of a 
+## grid derived graph and with features equal to the grid locations.
+### The grid has a multiple food sources. 
+### The environment's actions are UP, DOWN, LEFT and RIGHT encoded as the two dimensional vectors 
+### [(1,0), (-1, 0), (0,1), (0,-1)]
+### Parameter desciptions.
+### length (int) = GridEnvironment length
+### height (int) = GridEnvironment height
+### state_representation (string) = This parameter can take the form of either  "two-dim" or "tabular". In the first case the native state 
+###                                 representation simply takes the form of a two dimensional location tuple. 
+###                                 "two-dim", "tabular", "overwritten",
+###                                 "two-dim-location-normalized", "two-dim-encode-goal-location-normalized", "two-dim-encode-goal",
+###                                 "tabular-encode-goal"]
+
+class GridEnvironmentMultifood(GridEnvironment):
   def __init__(self,  
-              length, height, 
-              randomize = False, 
+              length, 
+              height,
+              state_representation = "two-dim",
+              num_food_sources = 1, 
               randomization_threshold = 0, 
-              manhattan_reward = False, 
-              tabular = True, 
-              location_based = False,
-              location_normalized = False,
-              encode_goal = False, 
-              sparsity = 0,
-              use_learned_reward_function = True,
-              reward_network_type = "MLP",
-              combine_with_sparse = False,
-              reversed_actions = False,
-              goal_region_radius = 1):
+              do_undo_map = IdentityDoUndo(),
+              reward_function = MultifoodIndicatorReward()              
+              ):
+ 
+
+
+    valid_state_representations = ["two-dim", "tabular", "overwritten",
+      "two-dim-location-normalized", "two-dim-encode-food-location-normalized", "two-dim-encode-food",
+      "tabular-encode-food", "food-distances", "food-distances-encode-food", "food-distances-encode-food-normalized",
+      "food-distances-normalized"]
+
+
+    if "encode-goal" in state_representation:
+      raise ValueError("Encode goal in state representation is not allowed for the Multifood Environment")
+
+
+    if state_representation not in valid_state_representations:
+      raise ValueError("State representation type not availale - {}".format(state_representation))
+
+
+
+
+    GridEnvironment.__init__(
+              self,
+              length=length, 
+              height = height, 
+              state_representation = "overwritten",
+              randomization_threshold = randomization_threshold,
+              do_undo_map = do_undo_map,
+              reward_function = reward_function
+              )
     
-    super().__init__(length, height, randomize, randomization_threshold, manhattan_reward, tabular, location_based, 
-      location_normalized, encode_goal, sparsity, use_learned_reward_function, reward_network_type, combine_with_sparse, reversed_actions)
-
-    raise ValueError("Grid Environment Non Markovian not properly implemented. Needs to be updated to match the implementation of GridEnvironment.")
-
-    self.name = "GridNonMarkovian"
-    self.state_dim = self.get_state_dim()
-    self.goal_region_radius = goal_region_radius
-    self.trajectory_reward = 0
-    self.set_goal_region()
-    self.last_three_steps = []
-
-  def restart_env(self):
-    self.curr_node = self.initial_node 
-    self.end = False
-    self.trajectory_reward = 0
-    self.last_three_steps = []
 
 
-  def set_goal_region(self):
-      goal_region = []
-      for i in range(self.length):
-        for j in range(self.height):
-          if np.abs(i-self.destination_node[0]) + np.abs(j - self.destination_node[1]) <= self.goal_region_radius:
-            goal_region.append((i,j))
+    self.num_food_sources = num_food_sources
+    self.state_representation = state_representation
+    self.name = "SimpleMultifood"
+    self.destination_node = None ## This is to ensure that no function uses self.destination_node as in the parent class.
 
-      self.goal_region = goal_region
+    self.valid_initial_nodes = list(self.graph.nodes)
+    self.valid_destination_nodes = list(self.graph.nodes)
 
-  def reset_initial_and_destination(self, hard_instances):
-    self.initial_node = random.choice(list(self.graph.nodes))
-    destination_node = random.choice(list(self.graph.nodes))
-    if hard_instances:
-      while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/2:
-        self.initial_node = random.choice(list(self.graph.nodes))
-        destination_node = random.choice(list(self.graph.nodes))
-    
-    #self.destination_node = destination_node
-    self.set_destination_node(destination_node)
+    if self.state_representation != "overwritten":
+      self.reset_environment()
+
+
+
+
+
+  def get_state(self):
+
+    if self.state_representation in ["two-dim", "tabular",
+      "two-dim-location-normalized"]:
+        state = GridEnvironment.get_state(self)
+
+    elif self.state_representation in ["two-dim-encode-food-location-normalized", "two-dim-encode-food",
+      "tabular-encode-food"]:
+        if self.state_representation == "tabular-encode-food":
+          state = torch.zeros(self.length, self.height).float()
+          state[self.curr_node[0], self.curr_node[1]] = 1
+
+          for (a,b) in self.food_sources:
+            state[a,b] = 1          
+          
+        elif "two-dim" in self.state_representation:
+          state = list(self.curr_node)
+          if "encode-food" in self.state_representation:
+            for food_source in self.food_sources:
+              state += list(food_source)
+          state = torch.tensor(state).float()
+
+          if "location-normalized" in self.state_representation:
+            state = state/(max(self.length, self.height)*1.0)
+
+
+    elif "food-distances" in self.state_representation:
+      state = [np.abs(a-self.curr_node[0]) + np.abs(b-self.curr_node[1]) for (a,b) in self.food_sources]
+      
+      if "encode-food" in self.state_representation:
+          for food_source in self.food_sources:
+            state += list(food_source)
+      state = torch.tensor(state).float()
+      if "normalized" in self.state_representation:
+          state = state/((self.length + self.height)*1.0)
+
+
+    else:
+      raise ValueError("State representation type not availale - {}".format(self.state_representation))
+
+    return self.do_undo_map.do_state(state.flatten())
+
+
+
+  def get_initial_destination_states(self):
+    raise ValueError("This function is not defined for the multifood environment")
+
+
+  def get_optimal_action_and_index(self, vertex):
+      return self.get_optimal_multifood_action_index_custom_graph(vertex, self.graph)
+
+
+  def get_optimal_multifood_action_index_custom_graph(self, vertex, graph):
+      min_dist_food_source = float('inf')
+      optimal_action_index = 0
+      for food_source in self.food_sources:
+        if food_source not in graph.nodes:
+          raise ValueError("food source is not in graph nodes {} vertex {}".format(food_source, vertex))
+        curr_food_source_action_index, _ = self.get_optimal_action_and_index_single_destination(vertex, food_source, graph)
+        curr_food_source_distance = shortest_path_length(graph, vertex, food_source)
+
+        if curr_food_source_distance < min_dist_food_source:
+          min_dist_food_source = curr_food_source_distance
+          optimal_action_index = curr_food_source_action_index
+      return optimal_action_index
+
+
+
+  def get_state_dim(self):
+
+    if self.state_representation in ["two-dim", "tabular",
+      "two-dim-location-normalized"]:
+        return GridEnvironment.get_state_dim(self)
+
+    elif self.state_representation in ["two-dim-encode-food-location-normalized", "two-dim-encode-food",
+      "tabular-encode-food"]:
+        if self.state_representation == "tabular-encode-food":
+          return self.length*self.height        
+          
+        elif "two-dim" in self.state_representation:
+          if "encode-food" in self.state_representation:
+            return 2*(self.num_food_sources+1)            
+            
+
+    elif "food-distances" in self.state_representation:
+      ### Compute distances to all the food sources.
+      state_dim = self.num_food_sources
+
+      if "encode-food" in self.state_representation:
+        state_dim += 2*self.num_food_sources
+      return state_dim
+    else:
+      raise ValueError("State representation type not availale - {}".format(self.state_representation))
+
+
+
+
+
+  ### Remove provided food source
+  ### The new food source can only be places in a valid node, including
+  ### all squares,  that do not contain a food source. 
+  def remove_and_reset_one_food_source(self, food_source_node):    
+    if food_source_node not in self.food_sources:
+      raise ValueError("Attempted to remove a food source node {} that is not in the list of food sources {}.".format(food_source_node, self.food_sources))
+    food_source_to_remove_index = self.food_sources.index(food_source_node)
+    left_food_sources = self.food_sources[:food_source_to_remove_index]
+    right_food_sources = self.food_sources[food_source_to_remove_index+1 :]
+    valid_states = [node for node in self.valid_state_respawn_single_food if node != self.curr_node]
+    new_food_sources = random.sample(valid_states, 1)
+    self.food_sources = left_food_sources + new_food_sources + right_food_sources
+    self.reset_valid_state_respawn_single_food()
+
+  ### Brings the environment back to pristine conditions 
+  def reset_environment(self, info = dict([])):
+    self.reset_initial_and_food_sources()
+
+
+
+  def reset_initial_and_food_sources(self):
+    self.initial_node = random.choice(self.valid_initial_nodes)
+    ##### 
+    self.reset_valid_states_respawn_all_food_sources()
+    self.food_sources = random.sample(self.valid_states_respawn_all_food_sources, self.num_food_sources)
+    self.reset_valid_state_respawn_single_food()
     self.restart_env()
-    self.set_goal_region()
+
+
+  def reset_valid_states_respawn_all_food_sources(self):
+    self.valid_states_respawn_all_food_sources = deepcopy(self.valid_destination_nodes)
+    self.valid_states_respawn_all_food_sources.remove(self.initial_node)
+
+
+  def reset_valid_state_respawn_single_food(self):
+    self.valid_state_respawn_single_food = [node for node in self.valid_destination_nodes if node not in self.food_sources]
+
+
+  ### RESTART ENV BRINGS THE CURRENT NODE BACK TO THE INITIAL ONE.
+  def restart_env(self):
+      self.end = False
+      self.curr_node = self.initial_node
+
+
+  def start_day(self):
+      self.end = False
+      self.initial_node = self.curr_node
+
+      if self.curr_node in self.food_sources:
+        self.remove_and_reset_one_food_source(self.curr_node)
+
+      
+      if len(self.food_sources) == 0:
+        raise ValueError("Somehow food sources went down to zero")
+
 
   def step(self, action_index):
-      action = self.actions[action_index]
-      next_vertex = ( (self.curr_node[0] + action[0])%self.length ,  (self.curr_node[1] + action[1])%self.height)
-      neighbors =  list(self.graph.neighbors(self.curr_node))
-      #reward = self.reward(self.curr_node, action)
-      # if  self.curr_node in self.goal_region:
-      #   self.trajectory_reward = 1
-      # else:
-      #   self.trajectory_reward = 0
+    next_vertex = self.get_next_vertex(self.curr_node[0], self.curr_node[1], action_index)    
 
-      if len(self.last_three_steps) == 3:
-        self.last_three_steps = self.last_three_steps[1:] + [self.curr_node]
-      elif len(self.last_three_steps) < 3:
-        self.last_three_steps += [self.curr_node]
-      else:
-        raise ValueError("The last three steps list is larger than 3")
-      
-      rew = 1
-      for node in self.last_three_steps:
-        if node not in self.goal_region:
-          rew = 0
-      self.trajectory_reward = rew
-      ## Dynamics:
-      
-      if next_vertex in neighbors:
-         self.curr_node = next_vertex
-      
-      return self.curr_node, None
+    reward_info = dict([])
+    reward = self.reward_function.evaluate(self, reward_info)
+    
+    ## Only return a reward the first time we reach the destination node.
+    if self.curr_node in self.food_sources and not self.end:
+      self.end = True
 
+    ## Dynamics:
+    if self.curr_node not in self.food_sources:
+       self.curr_node = next_vertex
+    
+
+    step_info = dict([])
+    step_info["curr_node"] = self.curr_node
+    step_info["reward"] = reward
+    step_info["state"] = self.get_state()
+    step_info["action"] = self.actions[action_index]
+    step_info["action_index"] = action_index
+    step_info["end"] = self.end
+
+    step_info["is_food_source"] = self.curr_node in self.food_sources
+
+    return step_info
+
+
+
+
+
+
+
+
+
+
+
+## This class implements a simple grid environment that consists of a 
+## grid derived graph and with features equal to the grid locations.
+### The grid has a multiple food sources. 
+### The environment's actions are UP, DOWN, LEFT and RIGHT encoded as the two dimensional vectors 
+### [(1,0), (-1, 0), (0,1), (0,-1)]
+### Parameter desciptions.
+### length (int) = GridEnvironment length
+### height (int) = GridEnvironment height
+### state_representation (string) = 
 
 
 class GridEnvironmentPit(GridEnvironment):
@@ -372,50 +604,37 @@ class GridEnvironmentPit(GridEnvironment):
               length, 
               height,
               state_representation = "pit", ### modify this representation value.
-              location_normalized = False,
-              encode_goal = False, 
-              pit = False, 
               pit_type = "border",
               initialization_type = "avoiding_pit",
               randomization_threshold = 0, 
-              manhattan_reward = False, 
-              sparsity = 0,
-              combine_with_sparse = False,
-              reversed_actions = False,
               length_rim = 3,
-              height_rim = 3
+              height_rim = 3,
+              do_undo_map = IdentityDoUndo(),
+              reward_function = SimpleIndicatorReward(),
               ):
  
+    valid_state_representations = ["two-dim", "tabular", "overwritten",
+      "two-dim-location-normalized", "two-dim-encode-goal-location-normalized", "two-dim-encode-goal",
+      "tabular-encode-goal"]
 
+    if state_representation not in valid_state_representations:
+      raise ValueError("State representation type not availale - {}".format(state_representation))
 
-    self.pit = pit
+    #IPython.embed()
 
-    if not self.pit:
-      raise ValueError("There is no pit -- State dimension stuff will fail") 
-
-
-    super().__init__(length=length, 
+    GridEnvironment.__init__(
+              self,
+              length=length, 
               height = height, 
               state_representation = "overwritten",
-              location_normalized = location_normalized,
-              encode_goal = encode_goal,
-              randomization_threshold = randomization_threshold, 
-              manhattan_reward = manhattan_reward, 
-              sparsity = sparsity,
-              combine_with_sparse = combine_with_sparse,
-              reversed_actions = reversed_actions)
+              randomization_threshold = randomization_threshold,
+              do_undo_map = do_undo_map,
+              reward_function = reward_function
+              )
+
     
     self.name = "PitEnvironment"
-
-
-    if not self.pit:
-      raise ValueError("There is no pit -- State dimension stuff will fail") 
-
-
-    self.destination_node = None ## This is to ensure that no function using self.destination_node works and interferes with the environment works. 
-
-    if self.manhattan_reward:
-      raise ValueError("Manhattan reward is not supported for the pit environment")
+    self.state_representation = state_representation
 
 
     #self.near_pit_initialization = near_pit_initialization
@@ -424,30 +643,46 @@ class GridEnvironmentPit(GridEnvironment):
     self.length_rim = length_rim
     self.height_rim = height_rim
 
-    self.pit = pit
     self.pit_type = pit_type
     if pit_type not in ["border", "central"]:
       raise ValueError("pit type set to unknown pit type")
-    # if not pit and near_pit_initialization:
-    #   raise ValueError("Pit set to False and near pit initialization set to True")
-    if not pit and initialization_type == "near_pit":
-      raise ValueError("Pit set to False and near pit initialization set to True")
-    if not pit and initialization_type == "avoiding_pit":
-      raise ValueError("Pit set to False and initialization type set to avoiding_pit")
 
     if initialization_type not in ["near_pit", "avoiding_pit"]:
       raise ValueError("Initialization_type not recognized {}".format(initialization_type))
 
+
+    #pself.pit = True
     self.set_pit_nodes()
 
+    if self.initialization_type == "near_pit":
+      self.valid_initial_nodes = list(self.outer_rim)
+    elif self.initialization_type == "avoiding_pit":
+      self.valid_initial_nodes = list(self.pit_avoiding_graph.nodes)
+    else:
+      raise ValueError("Initialization type not recognized {}".format(initialization_type))
 
-    self.reset_initial_and_destination(hard_instances = False)
+    self.valid_destination_nodes = list(self.pit_avoiding_graph.nodes)
+
+
+
+    if self.state_representation != "overwritten":
+      self.reset_environment()
+
+
+
+  def get_optimal_action_and_index(self, vertex):
+    if self.is_pit(vertex[0], vertex[1]):
+      raise ValueError("Asked for optimal action for a pit vertex.")
+    if vertex in list(self.pit_avoiding_graph):
+      return self.get_optimal_action_and_index_single_destination(vertex, self.destination_node, self.pit_avoiding_graph)[0]
+    else:
+      in_pit_four_rims = [vertex in rim for rim in self.pit_four_rims]
+      return in_pit_four_rims.index(True)
 
 
   def set_pit_nodes(self):
     self.pit_nodes = []
-    self.pit_adjacent_nodes = []
-    self.pit_boundary = [] ### nodes not in the pit but one action away
+    self.outer_rim = []
 
     ## The i-th list in self.pit_four_rims
     ## corresponds to the pit_rim nodes for which action i
@@ -455,48 +690,35 @@ class GridEnvironmentPit(GridEnvironment):
     self.pit_four_rims = [[] for _ in range(4)]
 
     
-    if self.pit:
-      for i in range(self.length):
-        for j in range(self.height):
-          #print("asldkfm ", self.is_pit(i,j), " ", self.is_pit_adjacent(i,j))
-          if self.is_pit(i,j):
-            self.pit_nodes.append((i,j))
-          if self.is_pit_adjacent(i,j):
-            self.pit_adjacent_nodes.append((i,j))
+    for i in range(self.length):
+      for j in range(self.height):
+        if self.is_pit(i,j):
+          self.pit_nodes.append((i,j))
 
-          if not self.is_pit(i,j) and self.is_pit_adjacent(i,j):
-            self.pit_boundary.append((i,j))
-            ### Find what is the action that makes it be part of the pit
-            for action in self.actions:
-              neighbor = ( (i + action[0])%self.length ,  (j + action[1])%self.height)              
+        if self.is_outer_rim(i,j):
+          self.outer_rim.append((i,j))
+
+    for (i,j) in self.outer_rim:
+      ### find the node in the pit that 
+      adjacent_nodes = [self.get_next_vertex(i,j, m) for m in range(self.num_actions)]
+
+      adjacent_pit_node_index = [self.is_pit(i,j) for (i,j) in adjacent_nodes].index(True)
+      (i_pit, j_pit) = adjacent_nodes[adjacent_pit_node_index]
+
+      neighbors_of_pit_node = [self.get_next_vertex(i_pit, j_pit, m) for m in range(self.num_actions)]
+      i_j_index = neighbors_of_pit_node.index((i,j))
+
+      self.pit_four_rims[i_j_index].append((i,j))
 
 
-      for k, action in enumerate(self.actions):
-        for (i,j) in self.pit_boundary:
-          neighbor = ( (i + action[0])%self.length ,  (j + action[1])%self.height)          
-          if neighbor in self.pit_nodes:
-            self.pit_four_rims[k].append((i,j))
-
+    # if len(self.pit_nodes) == 0:
+    #   raise ValueError("Num of pit nodes is zero in a pit environment")
 
     self.pit_avoiding_graph = deepcopy(self.graph)
-    for node in self.pit_adjacent_nodes:
+    for node in self.pit_nodes + self.outer_rim:
       self.pit_avoiding_graph.remove_node(node)
 
 
-
-
-    #IPython.embed()
-  def reset_initial_and_destination(self, hard_instances):
-    self.initial_node = random.choice(list(self.graph.nodes))
-    destination_node = random.choice(list(self.graph.nodes))
-    if hard_instances:
-      while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/3:
-        self.initial_node = random.choice(list(self.graph.nodes))
-        destination_node = random.choice(list(self.graph.nodes))
-    
-    #self.destination_node = destination_node
-    self.set_destination_node(destination_node)
-    self.restart_env()
 
 
   def is_border_pit(self, i, j):
@@ -504,22 +726,6 @@ class GridEnvironmentPit(GridEnvironment):
       return True
     else:
       return False
-
-  def is_border_pit_adjacent(self, i,j):
-    if self.is_pit(i,j):
-      return True
-    else:
-      if i ==1:
-        return True 
-      else:
-        return False
-
-
-  def get_central_pit_indices(self):    
-    pit_length_indices = list(range(self.length_rim, self.length-self.length_rim))
-    pit_height_indices = list(range(self.height_rim, self.height - self.height_rim))
-    return pit_length_indices, pit_height_indices
-
 
 
   def is_central_pit(self, i,j):
@@ -531,20 +737,22 @@ class GridEnvironmentPit(GridEnvironment):
 
 
 
+  def is_outer_rim(self, i,j):
+    if self.is_pit(i,j):
+      return False
+    else:
+     adjacent_nodes = [ (max(0, i-1), j), (i, max(0, j-1)), (min(i+1, self.length-1), j), (i, min(j+1, self.height-1)) ]
+     if np.sum([self.is_pit(node[0], node[1]) for node in adjacent_nodes]) > 0:
+        return True
+     else:
+        return False
 
 
-  def is_central_pit_adjacent(self, i,j):
-    pit_length_indices, pit_height_indices = self.get_central_pit_indices()
-    pit_nodes = list(itertools.product( pit_length_indices, pit_height_indices) )
-    adjacent_nodes = [ (i,j), (max(0, i-1), j), (i, max(0, j-1)), (min(i+1, self.length-1), j), (i, min(j+1, self.height-1)) ]
 
-    is_pit_adjacent= False
-    for node in adjacent_nodes:
-      if node in pit_nodes:
-        is_pit_adjacent = True
-
-    return is_pit_adjacent
-
+  def get_central_pit_indices(self):    
+    pit_length_indices = list(range(self.length_rim, self.length-self.length_rim))
+    pit_height_indices = list(range(self.height_rim, self.height - self.height_rim))
+    return pit_length_indices, pit_height_indices
 
 
 
@@ -556,80 +764,57 @@ class GridEnvironmentPit(GridEnvironment):
     else:
       raise ValueError("unrecognized pit_type {}".format(self.pit_type))
 
-  def is_pit_adjacent(self, i,j):
-    if self.pit_type == "border":
-      return self.is_border_pit_adjacent(i,j)
-
-    elif self.pit_type == "central":
-      return self.is_central_pit_adjacent(i,j)
-    else:
-      raise ValueError("unrecognized type {} ".format(self.pit_type))
-
-
-
-  def reset_initial(self):
-    if self.initialization_type == "near_pit":
-    #if self.near_pit_initialization:
-      self.initial_node = random.choice(list(self.pit_adjacent_nodes))
-    elif self.initialization_type == "avoiding_pit":
-      self.initial_node = random.choice(list(self.pit_avoiding_graph.nodes))
-
-    else:
-      self.initial_node = random.choice(list(self.graph.nodes))
-    while self.initial_node in self.pit_nodes:
-          self.initial_node = random.choice(list(self.graph.nodes))
-
-    self.curr_node = self.initial_node
-    self.end = False
-
       
 
 
   def get_state(self):
-    ### Compute the closest distance to the pit
-    min_dist = float("inf")
-    for pit_node in self.pit_nodes:
-      distance = np.abs(pit_node[0] - self.curr_node[0]) + np.abs(pit_node[1] - self.curr_node[1])
-      if distance < min_dist:
-        min_dist = distance
 
-    ### Compute distances to all the food sources.
-
-    distances_food = np.abs(self.destination_node[0]-self.curr_node[0]) + np.abs(self.destination_node[0]-self.curr_node[1]) 
-
-    ### add an if else statement that loops over the different values. 
-    state = torch.tensor([min_dist, distances_food])
-
-    return state
+    if self.state_representation in ["two-dim", "tabular", "overwritten",
+      "two-dim-location-normalized", "two-dim-encode-goal-location-normalized", "two-dim-encode-goal",
+      "tabular-encode-goal"]:
+        return GridEnvironment.get_state(self)
+    else:
+      raise ValueError("Not implemented state representation {}".format(self.state_representation))
 
 
-  def get_state_dim(self):
-    return 2
 
 
   def step(self, action_index):
     action = self.actions[action_index]
-    next_vertex = ( (self.curr_node[0] + action[0])%self.length ,  (self.curr_node[1] + action[1])%self.height)
-    neighbors =  list(self.graph.neighbors(self.curr_node))
-    reward = self.reward(self.curr_node, action)
+    
+    if random.random() > self.randomization_threshold:
+      next_vertex = self.get_next_vertex(self.curr_node[0], self.curr_node[1], action_index)
+    else:
+      next_vertex = self.curr_node
+
+    #next_vertex = ( (self.curr_node[0] + action[0])%self.length ,  (self.curr_node[1] + action[1])%self.height)
+    #neighbors =  list(self.graph.neighbors(self.curr_node))
+    reward_info = dict([("action", action)])
+
+    reward = self.reward_function.evaluate(self, reward_info)
     
     ## Only return a reward the first time we reach the destination node.
-
-
-
-    if self.curr_node in self.food_sources and not self.end:
-      #print("reached here! ", self.curr_node, self.destination_node)
-      self.end = True
 
     if self.curr_node in self.pit_nodes:
         self.end = True
 
     ## Dynamics:
-    if next_vertex in neighbors and self.curr_node not in self.food_sources and self.curr_node not in self.pit_nodes:
+    if self.curr_node not in self.pit_nodes and self.curr_node != self.destination_node:
        self.curr_node = next_vertex
     
 
-    return self.curr_node, reward
+
+
+    step_info = dict([])
+    step_info["curr_node"] = self.curr_node
+    step_info["reward"] = reward
+    step_info["state"] = self.get_state()
+    step_info["action"] = action
+    step_info["action_index"] = action_index
+    step_info["end"] = self.end
+    step_info["is_pit"] = self.curr_node in self.pit_nodes
+
+    return step_info
 
 
 
@@ -638,166 +823,172 @@ class GridEnvironmentPit(GridEnvironment):
 
 
 
-class GridEnvironmentMultifood(GridEnvironment):
+
+
+class GridEnvironmentPitMultifood(GridEnvironmentPit,GridEnvironmentMultifood):
   def __init__(self,  
               length, 
               height,
-              state_representation = "pit-foodsources",
-              location_normalized = False,
-              encode_goal = False, 
-              num_food_sources = 1, 
+              state_representation = "pit", ### modify this representation value.
+              pit_type = "central",
+              initialization_type = "avoiding_pit",
               randomization_threshold = 0, 
-              manhattan_reward = False, 
-              sparsity = 0,
-              combine_with_sparse = False,
-              reversed_actions = False,
+              num_food_sources = 1,
               length_rim = 3,
-              height_rim = 3
+              height_rim = 3,
+              do_undo_map = IdentityDoUndo(),
+              reward_function = MultifoodIndicatorReward(),
               ):
  
+    valid_multifood_state_representations = ["two-dim", "tabular", "overwritten",
+      "two-dim-location-normalized", "two-dim-encode-food-location-normalized", "two-dim-encode-food",
+      "tabular-encode-food", "food-distances", "food-distances-encode-food", "food-distances-encode-food-normalized",
+      "food-distances-normalized"]
 
-    if num_food_sources > 1 and encode_goal:
-      raise ValueError("Number of food sources is more than one and state representation has encode goal option on")
 
-    self.num_food_sources = num_food_sources
+    if state_representation not in valid_multifood_state_representations:
+      raise ValueError("State representation type not availale - {}".format(state_representation))
 
 
-    super().__init__(length=length, 
+
+    GridEnvironmentPit.__init__(
+              self,
+              length=length, 
               height = height, 
               state_representation = "overwritten",
-              location_normalized = location_normalized,
-              encode_goal = encode_goal,
-              randomization_threshold = randomization_threshold, 
-              manhattan_reward = manhattan_reward, 
-              sparsity = sparsity,
-              combine_with_sparse = combine_with_sparse,
-              reversed_actions = reversed_actions)
+              pit_type = pit_type,
+              initialization_type = initialization_type,              
+              length_rim = length_rim,
+              height_rim = height_rim,
+              randomization_threshold = randomization_threshold,
+              do_undo_map = do_undo_map,
+              reward_function = reward_function
+              )
+
+
+    GridEnvironmentMultifood.__init__(
+              self,
+              length=length, 
+              height = height, 
+              state_representation = "overwritten",
+              randomization_threshold = randomization_threshold,
+              num_food_sources = num_food_sources,
+              do_undo_map = do_undo_map,
+              reward_function = reward_function
+              )
+
     
-    self.name = "SimpleMultifood"
+    self.name = "MultifoodPitEnvironment"
+    self.state_representation = state_representation
+    self.destination_node = None
 
-    ### This needs to change. 
-    if num_food_sources > 1 and encode_goal:
-      raise ValueError("Number of food sources is more than one and state representation has encode goal option on")
+    if self.initialization_type == "near_pit":
+      self.valid_initial_nodes = list(self.outer_rim)
+    elif self.initialization_type == "avoiding_pit":
+      self.valid_initial_nodes = list(self.pit_avoiding_graph.nodes)
+    else:
+      raise ValueError("Initialization type not recognized {}".format(initialization_type))
 
-
-
-    self.name = "SimpleMultifood"
-    self.num_food_sources = num_food_sources
-    self.destination_node = None ## This is to ensure that no function using self.destination_node as 
-
-    if self.manhattan_reward:
-      raise ValueError("Manhattan reward is not supported for the multi-food environment")
+    self.valid_destination_nodes = list(self.pit_avoiding_graph.nodes)
 
 
-    #self.near_pit_initialization = near_pit_initialization
 
-    self.length_rim = length_rim
-    self.height_rim = height_rim
-
-
-    self.reset_initial_and_food_sources()
+    if self.state_representation != "overwritten":
+      self.reset_environment()
 
 
-  ### Overwriting the restart env function to do nothing.
-  def restart_env(self):
-    pass
-
-
-  def reset_food_sources(self):
-    self.food_sources = []
-    valid_states = list(self.graph.nodes)
-    valid_states.remove(self.initial_node)
-    self.food_sources = random.sample(valid_states, self.num_food_sources)
-
-  def remove_and_reset_one_food_source(self, food_source_node):    
-    self.food_sources.remove(food_source_node)
-    if len(self.food_sources) != self.num_food_sources-1:
-      raise ValueError("Num food sources after removal inconsistent.")
-
-    valid_states =[]
-    for i in range(self.length):
-      for j in range(self.height):
-        if (i,j) not in [self.curr_node] + self.food_sources:
-          valid_states.append((i,j))
-    self.food_sources += random.sample(valid_states, 1)
+    #IPython.embed()
 
 
 
 
-  def reset_initial_and_food_sources(self):
-    self.initial_node = random.choice(list(self.graph.nodes))
-    self.curr_node = self.initial_node
-    self.end = False
-    self.reset_food_sources()
+
+
+
+
+  ### Brings the environment back to pristine conditions 
+  def reset_environment(self, info = dict([])):
+    GridEnvironmentMultifood.reset_initial_and_food_sources(self)
+
       
+  def restart_env(self):
+      self.end = False
+      self.curr_node = self.initial_node
+
+  def get_optimal_action_and_index(self, vertex):
+
+      if self.is_pit(vertex[0], vertex[1]):
+        raise ValueError("Asked for optimal action for a pit vertex.")
+
+      if vertex in list(self.pit_avoiding_graph.nodes):
+        return self.get_optimal_multifood_action_index_custom_graph(vertex, self.pit_avoiding_graph)
+      else:
+        in_pit_four_rims = [vertex in rim for rim in self.pit_four_rims]
+        return in_pit_four_rims.index(True)
+
+
 
 
   def get_state(self):
-    ### Compute distances to all the food sources.
-    distances_food = [np.abs(a-self.curr_node[0]) + np.abs(b-self.curr_node[1]) for (a,b) in self.food_sources]
 
-    state = torch.tensor(distances_food)
-
-    return state
-
-
-  def get_state_dim(self):
-    return self.num_food_sources 
+    if self.state_representation in ["two-dim", "tabular", "overwritten",
+      "two-dim-location-normalized", "two-dim-encode-food-location-normalized", "two-dim-encode-food",
+      "tabular-encode-food", "food-distances", "food-distances-encode-food", "food-distances-encode-food-normalized",
+      "food-distances-normalized"]:
+        return GridEnvironmentMultifood.get_state(self)
+    else:
+      raise ValueError("Not implemented state representation {}".format(self.state_representation))
 
 
-  def reward(self):
-    return 0
 
 
   def step(self, action_index):
-    next_vertex = self.get_next_vertex(self.curr_node[0], self.curr_node[1], action_index)    
-    reward = self.reward(self.curr_node, action)
+    action = self.actions[action_index]
     
-    ## Only return a reward the first time we reach the destination node.
+    if random.random() > self.randomization_threshold:
+      next_vertex = self.get_next_vertex(self.curr_node[0], self.curr_node[1], action_index)
+    else:
+      next_vertex = self.curr_node
 
+    neighbors =  list(self.graph.neighbors(self.curr_node))
+    reward_info = dict([("action", action)])
 
-
-    if self.curr_node in self.food_sources and not self.end:
-      #print("reached here! ", self.curr_node, self.destination_node)
-      self.end = True
+    reward = self.reward_function.evaluate(self, reward_info)
+    
 
     if self.curr_node in self.pit_nodes:
         self.end = True
 
+    if self.curr_node in self.food_sources:
+      self.end = True
+
     ## Dynamics:
-    if self.curr_node not in self.food_sources:
+    if self.curr_node not in self.food_sources + self.pit_nodes:
        self.curr_node = next_vertex
     
 
-    return self.curr_node, reward
+    step_info = dict([])
+    step_info["curr_node"] = self.curr_node
+    step_info["reward"] = reward
+    step_info["state"] = self.get_state()
+    step_info["action"] = action
+    step_info["action_index"] = action_index
+    step_info["end"] = self.end
+    step_info["is_pit"] = self.curr_node in self.pit_nodes
+    step_info["is_food_source"] = self.curr_node in self.food_sources
 
-  def reward(self, node, action):
-    if node in self.food_sources:
-      return 1
-    else:
-      return 0
+    return step_info
+
+
+
 
   def start_day(self):
-      self.end = False
-      self.initial_node = self.curr_node
-
-      if self.curr_node in self.food_sources:
-        #self.food_sources.remove(self.curr_node)
-        self.remove_and_reset_one_food_source(self.curr_node)
-
-      
-      if len(self.food_sources) == 0:
-        self.reset_food_sources()
+    GridEnvironmentMultifood.start_day(self)
 
 
 
-
-
-
-
-
-
-    
+  # def reset_initial_and_destination(self, hard_instances = True):
+  #   raise ValueError("Reset initial and destination is not available for MultifoodPitEnvironment.")
 
 
 
@@ -828,6 +1019,50 @@ def run_walk(env, policy, max_time = 1000):
       break
   return node_path, edge_path, states, action_indices, rewards
 
+
+
+
+
+
+
+### Except for state_info this is the same function as run_walk
+def run_multifood_walk(env, policy, max_time = 1000):
+  time_counter = 0
+  node_path =  []
+  states_info = []
+  edge_path = []
+  action_indices = []
+
+  rewards = []
+  is_food_source_list = []
+
+  while not env.end:
+    # print(env.get_state().flatten())
+
+
+    action_index = policy.get_action(env.get_state().flatten())
+
+    # print("Action ", action_index, " is placeholder color ", is_placeholder_color)
+    node_path.append(torch.from_numpy(np.array(env.curr_node)).to(DEVICE))
+    states_info.append(env.get_state())
+
+    old_vertex = env.curr_node
+    step_info = env.step(action_index)
+    r = step_info["reward"]
+    is_food_source = step_info["is_food_source"]
+    is_food_source_list.append(is_food_source)
+    action_indices.append(action_index)
+    edge_path.append(torch.from_numpy(np.array((old_vertex, env.curr_node))).to(DEVICE))
+    #node_path.append(env.curr_node)
+    rewards.append(r)
+
+    time_counter += 1
+    if time_counter > max_time:
+      break
+  #action_indices.append(policy.get_action(env.get_state()))
+  # IPython.embed()
+  # raise ValueError("asldfkm")
+  return node_path, edge_path, states_info, action_indices, rewards, is_food_source_list
 
 
 
