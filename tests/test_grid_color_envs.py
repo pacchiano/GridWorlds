@@ -37,6 +37,7 @@ from gridworlds.environments_color import *
 from gridworlds.policies_color import *
 from gridworlds.pg_learning_color import *
 
+from gridworlds.rendering_tools import save_grid_diagnostic_image, save_color_grid_diagnostic_image
 
 
 length = 10
@@ -57,14 +58,13 @@ env = ColorGridEnvironment(length,
 		num_placeholder_colors = num_placeholder_colors,
 		color_action_map = color_action_map,
 		placeholder_color_prob = placeholder_color_prob,
-		manhattan_reward= manhattan_reward, 
-	 	sparsity = sparsity)
+	 	)
 
 
 env.create_color_map()
 
-
-env.reset_initial_and_destination(hard_instances = True, reinitialize_placeholders = False)
+env.reset_environment(info = dict([("hard_instances", True), ("reinitialize_placeholders", False)]))
+# env.reset_initial_and_destination(hard_instances = True, reinitialize_placeholders = False)
 
 
 
@@ -103,22 +103,25 @@ state_dim = env.get_state_dim()
 num_actions = env.get_num_actions()
 
 
-policy = NNPolicy(state_dim, num_actions, hidden_layer = hidden_layer)
+policy = NNSoftmaxPolicy(state_dim, num_actions, hidden_layers = [50, 20])
+
+
 base_rewards, base_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
-save_graph_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample paths" , "{}/initial_sample_paths_color_hidden{}.png".format(base_dir, hidden_layer))
+save_grid_diagnostic_image( env, policy, num_env_steps, 10,"Initial sample paths" , "{}/initial_sample_paths_color_hidden{}.png".format(base_dir, hidden_layer))
 
 
 
-policy, training_reward_evolution, training_success_evolution = learn_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, verbose = verbose, supress_training_curve = True, logging_frequency = 10)
+policy, training_reward_evolution, training_success_evolution = learn_pg(env, policy, num_pg_steps, trajectory_batch_size, num_env_steps, 
+	verbose = verbose, supress_training_curve = True, logging_frequency = 10)
 
 pg_rewards, pg_success_num, _ = test_policy(env, policy, success_num_trials, num_env_steps)
-save_graph_diagnostic_image(env, policy, num_env_steps, 10, "After PG", "{}/after_pg_symmetries_hidden{}.png".format(base_dir,hidden_layer))
+save_grid_diagnostic_image(env, policy, num_env_steps, 10, "After PG", "{}/after_pg_symmetries_hidden{}.png".format(base_dir,hidden_layer))
 
 optimal_policy = OptimalColorPolicy(env)
 rew, suc, _ = test_policy(env, optimal_policy, success_num_trials, num_env_steps)
 
-save_graph_diagnostic_image(env, optimal_policy, num_env_steps, 10, "Optimal policy", "{}/optimal_policy_paths.png".format(base_dir))
-save_color_graph_diagnostic_image(env, env.color_map, "Color Map", "{}/color_map.png".format(base_dir))
+save_grid_diagnostic_image(env, optimal_policy, num_env_steps, 10, "Optimal policy", "{}/optimal_policy_paths.png".format(base_dir))
+save_color_grid_diagnostic_image(env, env.color_map, "Color Map", "{}/color_map.png".format(base_dir))
 
 
 
@@ -147,8 +150,7 @@ print("String with placeholders \n", string_with_placeholders)
 policy, training_reward_evolution, training_success_evolution, all_rewards = learn_color_pg(env, color_policy, num_pg_steps, trajectory_batch_size, num_env_steps, verbose = verbose, supress_training_curve = True, logging_frequency = 10)
 
 
-
-# IPython.embed()
+IPython.embed()
 
 env_multifood = ColorGridEnvironmentMultifood(
 		length, 
@@ -167,7 +169,7 @@ env_multifood = ColorGridEnvironmentMultifood(
 
 
 
-save_color_graph_diagnostic_image(env_multifood, env_multifood.color_map, "Color Map Multifood", "{}/color_map_multifood.png".format(base_dir))
+save_color_grid_diagnostic_image(env_multifood, env_multifood.color_map, "Color Map Multifood", "{}/color_map_multifood.png".format(base_dir))
 
 
 string_with_placeholders = np.zeros((num_colors + num_placeholder_colors, env.get_num_actions()+1))
@@ -192,7 +194,7 @@ color_policy, training_reward_evolution_multifood, training_success_evolution_mu
 
 
 for i in range(8):
-	save_graph_diagnostic_image(env_multifood, color_policy, num_env_steps, 1, "Optimal policy multifood", "{}/learned_policy_paths_multifood_day_{}.png".format(base_dir, i+1))
+	save_grid_diagnostic_image(env_multifood, color_policy, num_env_steps, 1, "Optimal policy multifood", "{}/learned_policy_paths_multifood_day_{}.png".format(base_dir, i+1))
 	env_multifood.start_day()
 	# optimal_policy = OptimalColorPolicy(env_multifood)
 

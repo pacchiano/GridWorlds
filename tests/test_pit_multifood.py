@@ -26,6 +26,7 @@ import time
 import ray
 import pkg_resources
 
+import imageio
 
 import IPython
 
@@ -45,11 +46,12 @@ from gridworlds.environments_smell import *
 from gridworlds.pg_learning_multifood import *
 from gridworlds.rendering_tools import *
 
-from gridworlds.rewards import MultifoodProximateReward
+
 from gridworlds.policies_multifood_grid import OptimalMultifoodPitPolicy
 
-base_dir = "./tests/figs/multifood/"#.format(path)
 
+base_dir = "./tests/figs/pit_multifood/"#.format(path)
+ 
 if not os.path.isdir(base_dir):
 			try:
 				os.makedirs(base_dir)
@@ -62,57 +64,79 @@ if not os.path.isdir(base_dir):
 
 length = 15
 height = 15
-num_food_sources = 8
 verbose = True
 num_env_steps = 30
 success_num_trials = 100
-num_multipolicy_pg_steps = 30
+num_pit_pg_steps = 30
 
 hidden_layer =10
 stepsize = 1
 trajectory_batch_size = 30
 
-state_representation = "tabular-encode-food" #["two-dim", "tabular", "overwritten",
-      # "two-dim-location-normalized", "two-dim-encode-food-location-normalized", "two-dim-encode-food",
-      # "tabular-encode-food", "food-distances", "food-distances-encode-food", "food-distances-encode-food-normalized",
-      # "food-distances-normalized"]
+state_representation = "two-dim" #
+num_food_sources = 8
 
 
-env_multifood = GridEnvironmentMultifood(
+env_pit_multifood = GridEnvironmentPitMultifood(
 		length, 
 		height, 
 		state_representation = state_representation,
-		num_food_sources = num_food_sources
+		pit_type = "central",
+		initialization_type = "avoiding_pit",
+		num_food_sources = num_food_sources,
+		length_rim = 5,
+		height_rim = 5
 		)
 
-env_multifood.add_reward_function(MultifoodProximateReward())
 
 
-state_dim = env_multifood.get_state_dim()
-num_actions = env_multifood.get_num_actions()
-env_multifood.reset_initial_and_food_sources()
+# state_dim = env_pit.get_state_dim()
+# num_actions = env_pit.get_num_actions()
+# env_pit.reset_initial_and_destination(hard_instances = True)
 
 
-policy = NNSoftmaxPolicy(state_dim, num_actions, hidden_layers = [50, 20])
+# policy = NNSoftmaxPolicy(state_dim, num_actions, hidden_layers = [50, 20])
 
 
-policy, training_reward_evolution_multifood, training_success_evolution_multifood, all_rewards = learn_multifood_pg(env_multifood, policy, 
-	num_multipolicy_pg_steps, 
-	trajectory_batch_size, num_env_steps, 
-	multifood = True, verbose = verbose, supress_training_curve = False, logging_frequency = 10)
+# policy, training_reward_evolution_pit, training_success_evolution_pit = learn_pg(env_pit, policy, 
+# 	num_pit_pg_steps, 
+# 	trajectory_batch_size, num_env_steps, verbose = verbose, 
+# 	supress_training_curve = False, logging_frequency = 10)
 
 
-env_multifood.reset_initial_and_food_sources()
+# env_pit.reset_initial_and_destination(hard_instances = True)
 
 
-policy = OptimalMultifoodPitPolicy(env_multifood)
+policy = OptimalMultifoodPitPolicy(env_pit_multifood)
+
+# policy = RandomPolicy()
+
+
+diagnostic_images_filenames = []
+
 
 for i in range(15):
-	save_grid_diagnostic_image(env_multifood, policy, num_env_steps, 1, 
+	diagnostic_image_file = "{}/optimal_policy_paths_pit_multifood_trial_{}.png".format(base_dir, i+1)
+	diagnostic_images_filenames.append(diagnostic_image_file)
+	save_grid_diagnostic_image(env_pit_multifood, policy, num_env_steps, 1, 
 		"Trained Policy Multifood", 
-		"{}/learned_policy_paths_multifood_day_{}.png".format(base_dir, i+1))
-	#env_multifood.start_day()
-	env_multifood.reset_environment()
+		diagnostic_image_file)
+
+	#env_pit_multifood.restart_env()
+	env_pit_multifood.start_day()
+
+
+
+
+
+images = []
+for filename in diagnostic_images_filenames:
+    images.append(imageio.imread(filename))
+imageio.mimsave('{}/movie.gif'.format(base_dir), images)
+
+
+
+
 
 IPython.embed()
 
