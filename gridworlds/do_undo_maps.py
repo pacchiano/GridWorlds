@@ -1,6 +1,6 @@
-import matplotlib 
+import matplotlib
 import matplotlib.pyplot as plt
-import torch 
+import torch
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -54,7 +54,7 @@ class DoUndoMap:
 
 
 class IdentityDoUndo(DoUndoMap):
-	
+
 	def do_state(self, state):
 		return state
 
@@ -78,25 +78,25 @@ class IdentityDoUndo(DoUndoMap):
 
 class LinearDoUndoDiscrete(IdentityDoUndo):
 	def __init__(self, linear_do):
-		
+
 		if len(linear_do.shape) != 2:
 			raise ValueError("The shape of the linear_do map is not a matrix. It equals {}.".format(linear_do.shape))
 
 		if linear_do.shape[0] != linear_do.shape[1]:
-			raise ValueError("""The shape of the linear map is a matrix but the 
-				first dimension does not equal the second. 
+			raise ValueError("""The shape of the linear map is a matrix but the
+				first dimension does not equal the second.
 				First dimension {}. Second dimension {}.""".format(linear_do.shape[0], linear_do.shape[1]))
-		
+
 		self.linear_do = linear_do
 		self.linear_undo = torch.inverse(linear_do)
 
 	def do_state(self, state):
 		return torch.matmul(self.linear_do, state.flatten())
-	
+
 
 	def undo_state(self, state):
 		return torch.matmul(self.linear_undo, state.flatten())
-		
+
 	def undo_trajectory(self, trajectory):
 		raise ValueError("undo trajectory not implemented.")
 	    # undone_trajectory = copy.deepcopy(trajectory)
@@ -112,6 +112,24 @@ class LinearDoUndoDiscrete(IdentityDoUndo):
 	    # return done_trajectory
 
 
+class TorchModuleDoUndoDiscrete(IdentityDoUndo):
+	def __init__(self, net):
+		self.do   = net.eval()#.clone()
+		for param in net.parameters():
+			param.requires_grad = False
+		self.undo = None
+
+	def do_state(self, state):
+		return self.do(state)
+
+	def undo_state(self, state):
+		raise ValueError("undo not implemented.")
+
+	def undo_trajectory(self, trajectory):
+		raise ValueError("undo trajectory not implemented.")
+
+	def do_trajectory(self, trajectory):
+		raise ValueError("do trajectory not implemented.")
 
 
 
@@ -139,8 +157,3 @@ class ReverseActionsDoUndoDiscrete(IdentityDoUndo):
 
 	def do_trajectory(self, trajectory):
 		raise ValueError("Do trajectory not implemneneted.")
-
-
-
-
-
