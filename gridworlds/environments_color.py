@@ -305,6 +305,7 @@ class ColorGridEnvironmentMultifood(ColorGridEnvironment,GridEnvironmentPitMulti
 			raise ValueError("State representation different from colors")
 		else:
 			return self.get_state_helper(self.curr_node)
+			
 	### Overwriting the restart env function to do nothing.
 	def restart_env(self):
 	  self.end = False

@@ -49,7 +49,7 @@ from gridworlds.rendering_tools import *
 from gridworlds.policies_multifood_grid import OptimalMultifoodPitPolicy
 
 
-base_dir = "./tests/figs/pit/"#.format(path)
+base_dir = "./figs/pit/"#.format(path)
  
 if not os.path.isdir(base_dir):
 			try:

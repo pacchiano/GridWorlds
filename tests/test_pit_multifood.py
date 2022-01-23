@@ -46,7 +46,7 @@ from gridworlds.rendering_tools import *
 from gridworlds.policies_multifood_grid import OptimalMultifoodPitPolicy
 
 
-base_dir = "./tests/figs/pit_multifood/"#.format(path)
+base_dir = "./figs/pit_multifood/"#.format(path)
  
 if not os.path.isdir(base_dir):
 			try:
@@ -80,8 +80,8 @@ env_pit_multifood = GridEnvironmentPitMultifood(
 		pit_type = "central",
 		initialization_type = "avoiding_pit",
 		num_food_sources = num_food_sources,
-		length_rim = 20,
-		height_rim = 20
+		length_rim = 5,
+		height_rim = 5
 		)
 
 

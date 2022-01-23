@@ -54,7 +54,7 @@ class ColorPolicy(NNSoftmaxPolicy):
 		self.string_with_placeholders = string_with_placeholders
 		self.reactive = reactive
 
-		super().__init__(state_dim, num_actions, hidden_layers = [50], activation_type = activation_type, device =  device)
+		super().__init__(state_dim, num_actions, hidden_layers = hidden_layers, activation_type = activation_type, device =  device)
 
 
 

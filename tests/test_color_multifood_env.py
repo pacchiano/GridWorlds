@@ -40,15 +40,13 @@ from gridworlds.pg_learning import *
 from gridworlds.environments_color import *
 from gridworlds.policies_color import *
 from gridworlds.pg_learning_color import *
-
+from gridworlds.rendering_tools import save_color_grid_diagnostic_image, save_grid_diagnostic_image
 
 length = 15
 height = 10
-manhattan_reward = False
-sparsity = 0
-num_colors = 8
+num_fixed_colors = 8
 num_placeholder_colors =4# 1
-color_action_map  = [0, 1, 2, 3]*2
+fixed_color_action_map  = [0, 1, 2, 3]*2
 placeholder_color_prob = .5
 
 num_food_sources = 2
@@ -63,7 +61,7 @@ side_rim = 3
 
 #path = os.getcwd()
 
-base_dir = "./tests/figs/colors/"#.format(path)
+base_dir = "./figs/colors/"#.format(path)
 
 if not os.path.isdir(base_dir):
 			try:
@@ -96,16 +94,13 @@ env_multifood = ColorGridEnvironmentMultifood(
 		length, 
 		height, 
 		num_food_sources = num_food_sources,
-		num_colors = num_colors,
+		num_fixed_colors = num_fixed_colors,
 		num_placeholder_colors = num_placeholder_colors,
-		color_action_map = color_action_map,
+		fixed_color_action_map = fixed_color_action_map,
 		placeholder_color_prob = placeholder_color_prob,
-		pit = True,
 		pit_colors = pit_colors,
-		manhattan_reward= manhattan_reward, 
 		pit_type = "central",
 	 	initialization_type = initialization_type,
-	 	sparsity = sparsity,
 	 	length_rim = up_rim,
 	 	height_rim = side_rim)
 
@@ -153,9 +148,9 @@ env_multifood.create_color_map()
 # IPython.embed()
 # raise ValueError("asdlfkm")
 
-string_with_placeholders = np.zeros((num_colors + num_placeholder_colors, env_multifood.get_num_actions()+1))
-for i in range(num_colors + num_placeholder_colors):
-	if i < num_colors:
+string_with_placeholders = np.zeros((num_fixed_colors + num_placeholder_colors, env_multifood.get_num_actions()+1))
+for i in range(num_fixed_colors + num_placeholder_colors):
+	if i < num_fixed_colors:
 		index = i%4
 	else:
 		index = -1

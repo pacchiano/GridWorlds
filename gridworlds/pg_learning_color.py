@@ -28,7 +28,8 @@ from .policies import *
 from .environments import *
 from .environments_color import *
 
-def learn_color_pg(env, color_policy, num_pg_steps, trajectory_batch_size, num_env_steps, multifood = False, verbose = False, 
+def learn_color_pg(env, color_policy, num_pg_steps, trajectory_batch_size, 
+	num_env_steps, multifood = False, verbose = False, 
 	supress_training_curve = True, logging_frequency = None, reset_env = True):
 	#optimizer = torch.optim.Adam([policy.policy_params], lr=0.01)
 	if logging_frequency == None:

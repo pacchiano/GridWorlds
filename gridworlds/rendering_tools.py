@@ -36,7 +36,8 @@ def edge_list_to_tuples(edge_list):
   return [ [tuple(node.numpy()) for node in list(edge)] for edge in edge_list  ]
 
 
-
+### This function needs to be improved.
+### in the multifood worlds, the num_paths variable is not necessary. 
 def save_grid_diagnostic_image(env, policy, num_steps, num_paths, title, filename):
   white_map = np.zeros((env.length, env.height))
 
@@ -60,6 +61,14 @@ def save_grid_diagnostic_image(env, policy, num_steps, num_paths, title, filenam
   if env.name in ["SimpleMultifood", "MultifoodPitEnvironment", "ColorSimpleMultifood"]:
     ax.plot([food_source[1] for food_source in env.food_sources ], [food_source[0] for food_source in env.food_sources], 'x',markeredgewidth = 5, color = 'black', markersize = 12)
   
+
+  if env.name in ["PoisonMultifood"]:
+    good_food_sources = [env.food_sources[i] for i in range(len(env.food_sources)) if env.food_source_types[i] == "Good" ]
+    bad_food_sources  = [env.food_sources[i] for i in range(len(env.food_sources)) if env.food_source_types[i] == "Bad" ]
+    ax.plot([food_source[1] for food_source in good_food_sources ], [food_source[0] for food_source in good_food_sources], 'x',markeredgewidth = 5, color = 'black', markersize = 12)    
+    ax.plot([food_source[1] for food_source in bad_food_sources ], [food_source[0] for food_source in bad_food_sources], 'x',markeredgewidth = 5, color = 'green', markersize = 12)
+
+
   if env.name in ["PitEnvironment", "MultifoodPitEnvironment", "ColorSimpleMultifood"]: 
       if len(env.pit_nodes) > 0:
         ax.plot([pit[1] for pit in env.pit_nodes], [pit[0] for pit in env.pit_nodes], 'o', color = 'red', markersize = 12)
@@ -85,8 +94,8 @@ def save_grid_diagnostic_image(env, policy, num_steps, num_paths, title, filenam
 
   for i in range(num_paths):
 
-    env.restart_env()
     if env.name in ["GridSimple", "PitEnvironment", "ColorSimple"]:
+      env.restart_env()
       node_path1, edge_path1,states1, action_indices1, rewards1  = run_walk(env, policy, num_steps)
   
     elif env.name in ["SimpleMultifood", "MultifoodPitEnvironment", "ColorSimpleMultifood"]:
