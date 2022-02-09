@@ -1,6 +1,6 @@
-import matplotlib 
+import matplotlib
 import matplotlib.pyplot as plt
-import torch 
+import torch
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ import copy
 import IPython
 #%matplotlib inline
 from matplotlib import colors as colors_matplotlib
-
+import pdb
 
 from .do_undo_maps import IdentityDoUndo
 from .rewards import SimpleIndicatorReward
@@ -38,37 +38,38 @@ def node_list_to_tuples(node_list):
 def edge_list_to_tuples(edge_list):
   return [ [tuple(node.numpy()) for node in list(edge)] for edge in edge_list  ]
 
-## This class implements a simple grid environment that consists of a 
+## This class implements a simple grid environment that consists of a
 ## grid derived graph and with features equal to the grid locations.
-### The grid has a single goal location. 
-### The environment's actions are UP, DOWN, LEFT and RIGHT encoded as the two dimensional vectors 
+### The grid has a single goal location.
+### The environment's actions are UP, DOWN, LEFT and RIGHT encoded as the two dimensional vectors
 ### [(1,0), (-1, 0), (0,1), (0,-1)]
 ### Parameter desciptions.
 ### length (int) = GridEnvironment length
 ### height (int) = GridEnvironment height
 ### manhattan_reward (boolean) = If True the reward equals the negative manhattan distance between the current location and the goal.
-### state_representation (string) = This parameter can take the form of either  "two-dim" or "tabular". In the first case the native state 
-###                                 representation simply takes the form of a two dimensional location tuple. 
+### state_representation (string) = This parameter can take the form of either  "two-dim" or "tabular". In the first case the native state
+###                                 representation simply takes the form of a two dimensional location tuple.
 ###                                 "two-dim", "tabular", "overwritten",
 ###                                 "two-dim-location-normalized", "two-dim-encode-goal-location-normalized", "two-dim-encode-goal",
 ###                                 "tabular-encode-goal"]
 
 class GridEnvironment:
-  def __init__(self,  
-              length, 
-              height, 
+  def __init__(self,
+              length,
+              height,
               state_representation = "two-dim",
+              fixed_start_and_goal = True,
               randomization_threshold = 0,
               do_undo_map = IdentityDoUndo(),
               reward_function = SimpleIndicatorReward(),
               ):
-    
+
 
     self.name = "GridSimple"
     self.reward_function = reward_function
-
+    self.fixed_start_and_goal = fixed_start_and_goal
     self.graph = get_grid_graph(height, length)
-    self.initial_graph_edges = list(self.graph.edges) 
+    self.initial_graph_edges = list(self.graph.edges)
     self.randomization_threshold = randomization_threshold
 
 
@@ -85,7 +86,7 @@ class GridEnvironment:
 
     self.actions = [(1, 0), (-1,0), (0,1), (0, -1)]
     self.action_names = ["D", "U", "R", "L"]
-  
+
     self.num_actions = len(self.actions)
     self.length = length
     self.height = height
@@ -93,7 +94,7 @@ class GridEnvironment:
     ### Perhpas change the initial and destination nodes. Consider making these fields private.
     self.initial_node = random.choice(list(self.graph.nodes))
     self.destination_node = random.choice(list(self.graph.nodes))
-    
+
     self.curr_node = self.initial_node
     self.end = False
     self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
@@ -120,6 +121,25 @@ class GridEnvironment:
 
   def add_do_undo(self, do_undo_map):
     self.do_undo_map = do_undo_map
+    # Need to trigger action on initial/destination nodes
+    ### TODO: NEED TO DISCUSS WITH ALDO. WHAT DOES IT MEAN TO APPLY CONTINUOUS MATRIX ON DISCRETE STATE
+    ### might work here, but would break plotting for sure.
+    # pdb.set_trace()
+    # dummy = torch.randn(2)
+    # print(self.initial_node, self.destination_node)
+    # tensor_to_discrete = lambda T: tuple([int(t) for t in T])
+    #
+    # self.initial_node = tensor_to_discrete(
+    #                         self.do_undo_map.do_state(
+    #                         torch.cat([torch.tensor(self.initial_node),dummy]))[:2]
+    #                     )
+    # self.destination_node =  tensor_to_discrete(
+    #                     self.do_undo_map.do_state(
+    #                     torch.cat([torch.tensor(self.destination_node),dummy]))[:2]
+    #                     )
+    # print(self.initial_node, self.destination_node)
+    # pdb.set_trace()
+
 
   def add_reward_function(self, reward_function):
     self.reward_function = reward_function
@@ -135,25 +155,44 @@ class GridEnvironment:
 
 
   def reset_initial_and_destination(self, hard_instances):
+    #print('WARNING: Reseting env start and goal states')
     self.initial_node = random.choice(list(self.graph.nodes))
     destination_node = random.choice(list(self.graph.nodes))
     if hard_instances:
       while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/3:
         self.initial_node = random.choice(list(self.graph.nodes))
         destination_node = random.choice(list(self.graph.nodes))
-    
+
     #self.destination_node = destination_node
     self.set_destination_node(destination_node)
-    self.restart_env()
+    #self.restart_env() CANT CALL THIS HERE - INF RECURSION
+    self.curr_node = self.initial_node
+    self.end = False
+
+  ### Sets the self.initial_node to initial_node
+  def set_initial_node(self, initial_node):
+    self.initial_node = initial_node
+    #self.restart_env() CANT CALL THIS HERE - INF RECURSION
+    self.curr_node = self.initial_node
+    self.end = False
+
+  ### Sets the self.destination_node to destination_node
+  def set_destination_node(self, destination_node):
+    self.destination_node = destination_node
+    self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
+    #self.restart_env() CANT CALL THIS HERE - INF RECURSION
+    self.curr_node = self.initial_node
+    self.end = False
 
   def get_name(self):
     return "{}_{}".format(self.length, self.height)
-  
 
   def restart_env(self):
-    self.curr_node = self.initial_node 
+    if not self.fixed_start_and_goal:
+        self.reset_initial_and_destination(hard_instances = True)
+    self.curr_node = self.initial_node
     self.end = False
-  
+
   def get_state_dim(self):
     if "tabular" in self.state_representation:
       return self.height*self.length
@@ -170,7 +209,7 @@ class GridEnvironment:
 
 
   ### OUTPUTS the current state as a pytorch tensor.
-  def get_state(self):    
+  def get_state(self):
     return self.get_state_helper(self.curr_node)
 
 
@@ -185,7 +224,7 @@ class GridEnvironment:
       state[curr_node[0], curr_node[1]] = 1
       if "encode-goal" in self.state_representation:
         state[self.destination_node[0], self.destination_node[1] ] =1
-      
+
     elif "two-dim" in self.state_representation:
       state = torch.tensor(curr_node).float()
       if "encode-goal" in self.state_representation:
@@ -198,18 +237,18 @@ class GridEnvironment:
 
     return self.do_undo_map.do_state(state.flatten())
 
-      
+
   ### Takes an action and returns the next state and reward value.
   ### Inputs
-  ### action_index (int) = index of the action to take.  
+  ### action_index (int) = index of the action to take.
   def step(self, action_index):
-    
+
 
 
     action = self.actions[action_index]
     action = self.do_undo_map.do_action(action)
     new_action_index = self.actions.index(action)
-    
+
 
     # IPython.embed()
     # raise ValueError("Asdflkm")
@@ -225,7 +264,7 @@ class GridEnvironment:
     reward = self.reward_function.evaluate(self, reward_info)
 
     #reward = self.reward(self.curr_node, action)
-    
+
     ## Only return a reward the first time we reach the destination node.
     ## end the episode immediately after reaching a destination node.
     if self.curr_node == self.destination_node and not self.end:
@@ -235,7 +274,7 @@ class GridEnvironment:
     ## If the destination_node has been reached the agent cannot move out of this node.
     if self.curr_node != self.destination_node:
        self.curr_node = next_vertex
-    
+
     step_info = dict([])
     step_info["curr_node"] = self.curr_node
     step_info["reward"] = reward
@@ -263,39 +302,26 @@ class GridEnvironment:
 
 
 
-  ### Sets the self.initial_node to initial_node
-  def set_initial_node(self, initial_node):
-    self.initial_node = initial_node
-    self.restart_env()
-
-  ### Sets the self.destination_node to destination_node  
-  def set_destination_node(self, destination_node):
-    self.destination_node = destination_node
-    self.shortest_paths = dict(single_target_shortest_path_length(self.graph,self.destination_node))
-    self.restart_env()
-
-
-
 
 
 class GridEnvironmentNonMarkovian(GridEnvironment):
-  def __init__(self,  
-              length, height, 
-              randomize = False, 
-              randomization_threshold = 0, 
-              manhattan_reward = False, 
-              tabular = True, 
+  def __init__(self,
+              length, height,
+              randomize = False,
+              randomization_threshold = 0,
+              manhattan_reward = False,
+              tabular = True,
               location_based = False,
               location_normalized = False,
-              encode_goal = False, 
+              encode_goal = False,
               sparsity = 0,
               use_learned_reward_function = True,
               reward_network_type = "MLP",
               combine_with_sparse = False,
               reversed_actions = False,
               goal_region_radius = 1):
-    
-    super().__init__(length, height, randomize, randomization_threshold, manhattan_reward, tabular, location_based, 
+
+    super().__init__(length, height, randomize, randomization_threshold, manhattan_reward, tabular, location_based,
       location_normalized, encode_goal, sparsity, use_learned_reward_function, reward_network_type, combine_with_sparse, reversed_actions)
 
     raise ValueError("Grid Environment Non Markovian not properly implemented. Needs to be updated to match the implementation of GridEnvironment.")
@@ -308,7 +334,7 @@ class GridEnvironmentNonMarkovian(GridEnvironment):
     self.last_three_steps = []
 
   def restart_env(self):
-    self.curr_node = self.initial_node 
+    self.curr_node = self.initial_node
     self.end = False
     self.trajectory_reward = 0
     self.last_three_steps = []
@@ -330,7 +356,7 @@ class GridEnvironmentNonMarkovian(GridEnvironment):
       while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/2:
         self.initial_node = random.choice(list(self.graph.nodes))
         destination_node = random.choice(list(self.graph.nodes))
-    
+
     #self.destination_node = destination_node
     self.set_destination_node(destination_node)
     self.restart_env()
@@ -352,67 +378,67 @@ class GridEnvironmentNonMarkovian(GridEnvironment):
         self.last_three_steps += [self.curr_node]
       else:
         raise ValueError("The last three steps list is larger than 3")
-      
+
       rew = 1
       for node in self.last_three_steps:
         if node not in self.goal_region:
           rew = 0
       self.trajectory_reward = rew
       ## Dynamics:
-      
+
       if next_vertex in neighbors:
          self.curr_node = next_vertex
-      
+
       return self.curr_node, None
 
 
 
 class GridEnvironmentPit(GridEnvironment):
-  def __init__(self,  
-              length, 
+  def __init__(self,
+              length,
               height,
               state_representation = "pit", ### modify this representation value.
               location_normalized = False,
-              encode_goal = False, 
-              pit = False, 
+              encode_goal = False,
+              pit = False,
               pit_type = "border",
               initialization_type = "avoiding_pit",
-              randomization_threshold = 0, 
-              manhattan_reward = False, 
+              randomization_threshold = 0,
+              manhattan_reward = False,
               sparsity = 0,
               combine_with_sparse = False,
               reversed_actions = False,
               length_rim = 3,
               height_rim = 3
               ):
- 
+
 
 
     self.pit = pit
 
     if not self.pit:
-      raise ValueError("There is no pit -- State dimension stuff will fail") 
+      raise ValueError("There is no pit -- State dimension stuff will fail")
 
 
-    super().__init__(length=length, 
-              height = height, 
+    super().__init__(length=length,
+              height = height,
               state_representation = "overwritten",
               location_normalized = location_normalized,
               encode_goal = encode_goal,
-              randomization_threshold = randomization_threshold, 
-              manhattan_reward = manhattan_reward, 
+              randomization_threshold = randomization_threshold,
+              manhattan_reward = manhattan_reward,
               sparsity = sparsity,
               combine_with_sparse = combine_with_sparse,
               reversed_actions = reversed_actions)
-    
+
     self.name = "PitEnvironment"
 
 
     if not self.pit:
-      raise ValueError("There is no pit -- State dimension stuff will fail") 
+      raise ValueError("There is no pit -- State dimension stuff will fail")
 
 
-    self.destination_node = None ## This is to ensure that no function using self.destination_node works and interferes with the environment works. 
+    self.destination_node = None ## This is to ensure that no function using self.destination_node works and interferes with the environment works.
 
     if self.manhattan_reward:
       raise ValueError("Manhattan reward is not supported for the pit environment")
@@ -454,7 +480,7 @@ class GridEnvironmentPit(GridEnvironment):
     ## takes us into the pit.
     self.pit_four_rims = [[] for _ in range(4)]
 
-    
+
     if self.pit:
       for i in range(self.length):
         for j in range(self.height):
@@ -468,12 +494,12 @@ class GridEnvironmentPit(GridEnvironment):
             self.pit_boundary.append((i,j))
             ### Find what is the action that makes it be part of the pit
             for action in self.actions:
-              neighbor = ( (i + action[0])%self.length ,  (j + action[1])%self.height)              
+              neighbor = ( (i + action[0])%self.length ,  (j + action[1])%self.height)
 
 
       for k, action in enumerate(self.actions):
         for (i,j) in self.pit_boundary:
-          neighbor = ( (i + action[0])%self.length ,  (j + action[1])%self.height)          
+          neighbor = ( (i + action[0])%self.length ,  (j + action[1])%self.height)
           if neighbor in self.pit_nodes:
             self.pit_four_rims[k].append((i,j))
 
@@ -493,7 +519,7 @@ class GridEnvironmentPit(GridEnvironment):
       while np.abs(self.initial_node[0] - self.destination_node[0]) + np.abs(self.initial_node[1] - self.destination_node[1]) < (self.length + self.height)/3:
         self.initial_node = random.choice(list(self.graph.nodes))
         destination_node = random.choice(list(self.graph.nodes))
-    
+
     #self.destination_node = destination_node
     self.set_destination_node(destination_node)
     self.restart_env()
@@ -510,12 +536,12 @@ class GridEnvironmentPit(GridEnvironment):
       return True
     else:
       if i ==1:
-        return True 
+        return True
       else:
         return False
 
 
-  def get_central_pit_indices(self):    
+  def get_central_pit_indices(self):
     pit_length_indices = list(range(self.length_rim, self.length-self.length_rim))
     pit_height_indices = list(range(self.height_rim, self.height - self.height_rim))
     return pit_length_indices, pit_height_indices
@@ -582,7 +608,7 @@ class GridEnvironmentPit(GridEnvironment):
     self.curr_node = self.initial_node
     self.end = False
 
-      
+
 
 
   def get_state(self):
@@ -595,9 +621,9 @@ class GridEnvironmentPit(GridEnvironment):
 
     ### Compute distances to all the food sources.
 
-    distances_food = np.abs(self.destination_node[0]-self.curr_node[0]) + np.abs(self.destination_node[0]-self.curr_node[1]) 
+    distances_food = np.abs(self.destination_node[0]-self.curr_node[0]) + np.abs(self.destination_node[0]-self.curr_node[1])
 
-    ### add an if else statement that loops over the different values. 
+    ### add an if else statement that loops over the different values.
     state = torch.tensor([min_dist, distances_food])
 
     return state
@@ -612,7 +638,7 @@ class GridEnvironmentPit(GridEnvironment):
     next_vertex = ( (self.curr_node[0] + action[0])%self.length ,  (self.curr_node[1] + action[1])%self.height)
     neighbors =  list(self.graph.neighbors(self.curr_node))
     reward = self.reward(self.curr_node, action)
-    
+
     ## Only return a reward the first time we reach the destination node.
 
 
@@ -627,7 +653,7 @@ class GridEnvironmentPit(GridEnvironment):
     ## Dynamics:
     if next_vertex in neighbors and self.curr_node not in self.food_sources and self.curr_node not in self.pit_nodes:
        self.curr_node = next_vertex
-    
+
 
     return self.curr_node, reward
 
@@ -639,22 +665,22 @@ class GridEnvironmentPit(GridEnvironment):
 
 
 class GridEnvironmentMultifood(GridEnvironment):
-  def __init__(self,  
-              length, 
+  def __init__(self,
+              length,
               height,
               state_representation = "pit-foodsources",
               location_normalized = False,
-              encode_goal = False, 
-              num_food_sources = 1, 
-              randomization_threshold = 0, 
-              manhattan_reward = False, 
+              encode_goal = False,
+              num_food_sources = 1,
+              randomization_threshold = 0,
+              manhattan_reward = False,
               sparsity = 0,
               combine_with_sparse = False,
               reversed_actions = False,
               length_rim = 3,
               height_rim = 3
               ):
- 
+
 
     if num_food_sources > 1 and encode_goal:
       raise ValueError("Number of food sources is more than one and state representation has encode goal option on")
@@ -662,20 +688,20 @@ class GridEnvironmentMultifood(GridEnvironment):
     self.num_food_sources = num_food_sources
 
 
-    super().__init__(length=length, 
-              height = height, 
+    super().__init__(length=length,
+              height = height,
               state_representation = "overwritten",
               location_normalized = location_normalized,
               encode_goal = encode_goal,
-              randomization_threshold = randomization_threshold, 
-              manhattan_reward = manhattan_reward, 
+              randomization_threshold = randomization_threshold,
+              manhattan_reward = manhattan_reward,
               sparsity = sparsity,
               combine_with_sparse = combine_with_sparse,
               reversed_actions = reversed_actions)
-    
+
     self.name = "SimpleMultifood"
 
-    ### This needs to change. 
+    ### This needs to change.
     if num_food_sources > 1 and encode_goal:
       raise ValueError("Number of food sources is more than one and state representation has encode goal option on")
 
@@ -683,7 +709,7 @@ class GridEnvironmentMultifood(GridEnvironment):
 
     self.name = "SimpleMultifood"
     self.num_food_sources = num_food_sources
-    self.destination_node = None ## This is to ensure that no function using self.destination_node as 
+    self.destination_node = None ## This is to ensure that no function using self.destination_node as
 
     if self.manhattan_reward:
       raise ValueError("Manhattan reward is not supported for the multi-food environment")
@@ -709,7 +735,7 @@ class GridEnvironmentMultifood(GridEnvironment):
     valid_states.remove(self.initial_node)
     self.food_sources = random.sample(valid_states, self.num_food_sources)
 
-  def remove_and_reset_one_food_source(self, food_source_node):    
+  def remove_and_reset_one_food_source(self, food_source_node):
     self.food_sources.remove(food_source_node)
     if len(self.food_sources) != self.num_food_sources-1:
       raise ValueError("Num food sources after removal inconsistent.")
@@ -729,7 +755,7 @@ class GridEnvironmentMultifood(GridEnvironment):
     self.curr_node = self.initial_node
     self.end = False
     self.reset_food_sources()
-      
+
 
 
   def get_state(self):
@@ -742,7 +768,7 @@ class GridEnvironmentMultifood(GridEnvironment):
 
 
   def get_state_dim(self):
-    return self.num_food_sources 
+    return self.num_food_sources
 
 
   def reward(self):
@@ -750,9 +776,9 @@ class GridEnvironmentMultifood(GridEnvironment):
 
 
   def step(self, action_index):
-    next_vertex = self.get_next_vertex(self.curr_node[0], self.curr_node[1], action_index)    
+    next_vertex = self.get_next_vertex(self.curr_node[0], self.curr_node[1], action_index)
     reward = self.reward(self.curr_node, action)
-    
+
     ## Only return a reward the first time we reach the destination node.
 
 
@@ -767,7 +793,7 @@ class GridEnvironmentMultifood(GridEnvironment):
     ## Dynamics:
     if self.curr_node not in self.food_sources:
        self.curr_node = next_vertex
-    
+
 
     return self.curr_node, reward
 
@@ -785,7 +811,7 @@ class GridEnvironmentMultifood(GridEnvironment):
         #self.food_sources.remove(self.curr_node)
         self.remove_and_reset_one_food_source(self.curr_node)
 
-      
+
       if len(self.food_sources) == 0:
         self.reset_food_sources()
 
@@ -797,7 +823,7 @@ class GridEnvironmentMultifood(GridEnvironment):
 
 
 
-    
+
 
 
 
@@ -812,7 +838,7 @@ def run_walk(env, policy, max_time = 1000):
   while not env.end:
     node_path.append(torch.from_numpy(np.array(env.curr_node)))
     states.append(env.get_state())
-    
+
     #print("state ", env.get_state())
 
     action_index = policy.get_action(env.get_state().flatten())
@@ -827,18 +853,3 @@ def run_walk(env, policy, max_time = 1000):
     if time_counter > max_time:
       break
   return node_path, edge_path, states, action_indices, rewards
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

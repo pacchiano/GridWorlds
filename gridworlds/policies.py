@@ -1,4 +1,4 @@
-import matplotlib 
+import matplotlib
 import matplotlib.pyplot as plt
 
 import numpy as np
@@ -21,7 +21,7 @@ from .environments import run_walk
 
 
 class FeedforwardMultiLayerRepresentation(torch.nn.Module):
-    def __init__(self, input_size, hidden_layers, output_size, activation_type = "relu", 
+    def __init__(self, input_size, hidden_layers, output_size, activation_type = "relu",
       batch_norm = False, device = torch.device("cpu")):
         super(FeedforwardMultiLayerRepresentation, self).__init__()
         self.input_size = input_size
@@ -39,7 +39,7 @@ class FeedforwardMultiLayerRepresentation(torch.nn.Module):
             raise ValueError("Unrecognized activation type.")
 
         self.layers = torch.nn.ModuleList()
-        
+
         sizes = [input_size] + hidden_layers + [output_size]
 
         for i in range(len(sizes)-1):
@@ -65,7 +65,7 @@ class FeedforwardMultiLayerRepresentation(torch.nn.Module):
 
     def forward(self, x):
         representation = x
-        
+
         #IPython.embed()
         #raise ValueError("asldkfm")
         for i in range(len(self.layers)):
@@ -100,7 +100,7 @@ class FeedforwardMultiLayerRepresentation(torch.nn.Module):
 #                         # nn.ReLU(),
 #                         nn.Linear(hidden_size, output_dim, bias = False),
 #                         )
-    
+
 #     def forward(self, x):
 #         return self.network(x)
 
@@ -108,20 +108,20 @@ class FeedforwardMultiLayerRepresentation(torch.nn.Module):
 #     def __init__(self, input_dim, output_dim):
 #         super(LinearNetwork, self).__init__()
 #         self.network = nn.Linear(input_dim, output_dim)
-                           
+
 #     def forward(self, x):
 #         return self.network(x)
 
 
 
-# self, input_size, hidden_sizes, activation_type = "sigmoid", 
+# self, input_size, hidden_sizes, activation_type = "sigmoid",
 #       batch_norm = False, device = torch.device("cpu")
 
 class PolicyNetwork(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_layers=[50], activation_type = "relu", device = torch.device("cpu")):
         super(PolicyNetwork, self).__init__()
         self.action_dim = action_dim
-        self.network = FeedforwardMultiLayerRepresentation(input_size = state_dim, 
+        self.network = FeedforwardMultiLayerRepresentation(input_size = state_dim,
           hidden_layers = hidden_layers, output_size = action_dim , activation_type = activation_type,
           device = device)
 
@@ -131,7 +131,7 @@ class PolicyNetwork(nn.Module):
         action = dist.sample()
         if get_logprob:
           logprob = dist.log_prob(action_indices)
-          return logprob  
+          return logprob
         return action
 
 
@@ -142,11 +142,11 @@ class PolicyNetwork(nn.Module):
 
 
 class NNSoftmaxPolicy:
-  def __init__(self, state_dim, num_actions, hidden_layers = [50], 
+  def __init__(self, state_dim, num_actions, hidden_layers = [50],
     activation_type = "relu", device = torch.device("cpu")):
     self.num_actions = num_actions
     self.state_dim = state_dim
-    self.network = PolicyNetwork(state_dim, num_actions, hidden_layers = hidden_layers, 
+    self.network = PolicyNetwork(state_dim, num_actions, hidden_layers = hidden_layers,
       activation_type = "relu", device = torch.device("cpu"))
 
   def log_prob_loss(self, states, action_indices, weights):
@@ -181,20 +181,22 @@ class RandomPolicy:
 
 
 
-def test_policy(env, policy, num_trials, num_env_steps):
-  base_success_nums = []
-  collected_base_rewards = []
-  trajectories = []
+def test_policy(env, policy, num_trials, num_env_steps, reset_goal=False):
+    base_success_nums = []
+    collected_base_rewards = []
+    trajectories = []
 
-  for i in range(num_trials):
-    env.restart_env()
-    node_path1, _,states, _, rewards1  = run_walk(env, policy, num_env_steps)
-    base_success_nums.append( tuple(node_path1[-1].numpy())==env.destination_node)
-    collected_base_rewards.append(sum(rewards1))
-    trajectories.append(states)
+    for i in range(num_trials):
+        env.restart_env()
+        if reset_goal:
+        	print('WARNING: Reseting env goal')
+        	env.reset_initial_and_destination(hard_instances = True)
+        node_path1, _,states, _, rewards1  = run_walk(env, policy, num_env_steps)
+        base_success_nums.append( tuple(node_path1[-1].numpy())==env.destination_node)
+        collected_base_rewards.append(sum(rewards1))
+        trajectories.append(states)
 
-  base_success_num= np.mean(base_success_nums)
-  base_rewards = np.mean(collected_base_rewards)
+    base_success_num= np.mean(base_success_nums)
+    base_rewards = np.mean(collected_base_rewards)
 
-  return base_rewards, base_success_num, trajectories
-
+    return base_rewards, base_success_num, trajectories

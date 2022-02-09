@@ -1,6 +1,6 @@
-import matplotlib 
+import matplotlib
 import matplotlib.pyplot as plt
-import torch 
+import torch
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -79,10 +79,8 @@ def save_grid_diagnostic_image(env, policy, num_steps, num_paths, title, filenam
     raise ValueError("Too many paths, I don't have enough colors")
 
   for i in range(num_paths):
-
     env.restart_env()
     node_path1, edge_path1,states1, action_indices1, rewards1  = run_walk(env, policy, num_steps)
-    
 
     if num_paths > 2:
       color = color_map[colors[i]]
@@ -95,4 +93,3 @@ def save_grid_diagnostic_image(env, policy, num_steps, num_paths, title, filenam
   plt.title(title)
   plt.savefig(filename)
   plt.close("all")
-
