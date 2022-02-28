@@ -815,41 +815,25 @@ class GridEnvironmentMultifood(GridEnvironment):
       if len(self.food_sources) == 0:
         self.reset_food_sources()
 
-
-
-
-
-
-
-
-
-
-
-
-
-def run_walk(env, policy, max_time = 1000):
+def run_walk(env, policy, max_time = 1000, device='cpu'):
   time_counter = 0
   node_path =  []
   states = []
   edge_path = []
   action_indices = []
-
   rewards = []
   while not env.end:
-    node_path.append(torch.from_numpy(np.array(env.curr_node)))
-    states.append(env.get_state())
-
-    #print("state ", env.get_state())
-
+    node_path.append(torch.from_numpy(np.array(env.curr_node)).to(device))
+    states.append(env.get_state().to(device))
     action_index = policy.get_action(env.get_state().flatten())
     old_vertex = env.curr_node
     step_info = env.step(action_index)
     r = step_info["reward"]
     action_indices.append(action_index)
-    edge_path.append(torch.from_numpy(np.array((old_vertex, env.curr_node))))
+    edge_path.append(torch.from_numpy(np.array((old_vertex, env.curr_node))).to(device))
     rewards.append(r)
-
     time_counter += 1
     if time_counter > max_time:
       break
+
   return node_path, edge_path, states, action_indices, rewards

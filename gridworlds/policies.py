@@ -186,6 +186,8 @@ def test_policy(env, policy, num_trials, num_env_steps, reset_goal=False):
     collected_base_rewards = []
     trajectories = []
 
+    device = policy.device
+
     for i in range(num_trials):
         env.restart_env()
         if reset_goal:
