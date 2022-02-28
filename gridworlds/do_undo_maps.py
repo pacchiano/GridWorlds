@@ -113,17 +113,24 @@ class LinearDoUndoDiscrete(IdentityDoUndo):
 
 
 class TorchModuleDoUndoDiscrete(IdentityDoUndo):
-	def __init__(self, net):
-		self.do   = net.eval()#.clone()
-		for param in net.parameters():
+	def __init__(self, donet, undonet=None):
+		self.do   = donet.eval()#.clone()
+		for param in donet.parameters():
 			param.requires_grad = False
-		self.undo = None
+		if undonet:
+			self.undo   = undonet.eval()#.clone()
+			for param in undonet.parameters():
+				param.requires_grad = False
+		else:
+			self.undo = None
 
 	def do_state(self, state):
 		return self.do(state)
 
 	def undo_state(self, state):
-		raise ValueError("undo not implemented.")
+		if self.undo: return self.undo(state)
+		else:
+			raise ValueError("undo not provided.")
 
 	def undo_trajectory(self, trajectory):
 		raise ValueError("undo trajectory not implemented.")
