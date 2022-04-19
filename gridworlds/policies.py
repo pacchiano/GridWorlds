@@ -17,7 +17,7 @@ import torch.nn as nn
 from torch.distributions import Categorical
 import IPython
 from .environments import run_walk
-
+import pdb
 
 
 class FeedforwardMultiLayerRepresentation(torch.nn.Module):
@@ -65,9 +65,6 @@ class FeedforwardMultiLayerRepresentation(torch.nn.Module):
 
     def forward(self, x):
         representation = x
-
-        #IPython.embed()
-        #raise ValueError("asldkfm")
         for i in range(len(self.layers)):
             representation = self.layers[i](representation)
             if self.batch_norm:
@@ -140,35 +137,35 @@ class PolicyNetwork(nn.Module):
 
 
 
-
-class NNSoftmaxPolicy:
-  def __init__(self, state_dim, num_actions, hidden_layers = [50],
-    activation_type = "relu", device = torch.device("cpu")):
-    self.num_actions = num_actions
-    self.state_dim = state_dim
-    self.network = PolicyNetwork(state_dim, num_actions, hidden_layers = hidden_layers,
-      activation_type = "relu", device = torch.device("cpu"))
-
-  def log_prob_loss(self, states, action_indices, weights):
-    logprob =  self.network(states, action_indices = action_indices, get_logprob = True)
-    loss = -(logprob*weights).mean()
-    return loss
-
-  def get_action(self, state):
-    action = self.network(state)
-    return action
-
-  # def reset_parameters(self):
-  #   for _, module in self.network.named_children():
-  #     if hasattr(module, 'reset_parameters'):
-  #       print("resetting parameters")
-  #       module.reset_parameters()
-
-  def get_parameters_norm(self):
-    norm_sum = 0
-    for parameter in self.network.parameters():
-      norm_sum += torch.norm(parameter)
-    return norm_sum
+#
+# class NNSoftmaxPolicy:
+#   def __init__(self, state_dim, num_actions, hidden_layers = [50],
+#     activation_type = "relu", device = torch.device("cpu")):
+#     self.num_actions = num_actions
+#     self.state_dim = state_dim
+#     self.network = PolicyNetwork(state_dim, num_actions, hidden_layers = hidden_layers,
+#       activation_type = "relu", device = torch.device("cpu"))
+#
+#   def log_prob_loss(self, states, action_indices, weights):
+#     logprob =  self.network(states, action_indices = action_indices, get_logprob = True)
+#     loss = -(logprob*weights).mean()
+#     return loss
+#
+#   def get_action(self, state):
+#     action = self.network(state)
+#     return action
+#
+#   # def reset_parameters(self):
+#   #   for _, module in self.network.named_children():
+#   #     if hasattr(module, 'reset_parameters'):
+#   #       print("resetting parameters")
+#   #       module.reset_parameters()
+#
+#   def get_parameters_norm(self):
+#     norm_sum = 0
+#     for parameter in self.network.parameters():
+#       norm_sum += torch.norm(parameter)
+#     return norm_sum
 
 class RandomPolicy:
   def __init__(self, num_actions = 4):
@@ -178,27 +175,21 @@ class RandomPolicy:
     return random.choice(range(self.num_actions))
 
 
-
-
-
 def test_policy(env, policy, num_trials, num_env_steps, reset_goal=False):
     base_success_nums = []
     collected_base_rewards = []
     trajectories = []
-
-    device = policy.device
-
     for i in range(num_trials):
         env.restart_env()
         if reset_goal:
         	print('WARNING: Reseting env goal')
         	env.reset_initial_and_destination(hard_instances = True)
         node_path1, _,states, _, rewards1  = run_walk(env, policy, num_env_steps)
-        base_success_nums.append( tuple(node_path1[-1].numpy())==env.destination_node)
+        base_success_nums.append( tuple(node_path1[-1].cpu().numpy())==env.destination_node)
         collected_base_rewards.append(sum(rewards1))
         trajectories.append(states)
 
-    base_success_num= np.mean(base_success_nums)
+    base_success_num = np.mean(base_success_nums)
     base_rewards = np.mean(collected_base_rewards)
 
     return base_rewards, base_success_num, trajectories

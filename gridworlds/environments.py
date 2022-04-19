@@ -242,28 +242,16 @@ class GridEnvironment:
   ### Inputs
   ### action_index (int) = index of the action to take.
   def step(self, action_index):
-
-
-
     action = self.actions[action_index]
     action = self.do_undo_map.do_action(action)
     new_action_index = self.actions.index(action)
-
-
-    # IPython.embed()
-    # raise ValueError("Asdflkm")
-
     if random.random() > self.randomization_threshold:
       next_vertex = self.get_next_vertex(self.curr_node[0], self.curr_node[1], action_index)
     else:
       next_vertex = self.curr_node
-
     reward_info = dict([("action", action)])
 
-
     reward = self.reward_function.evaluate(self, reward_info)
-
-    #reward = self.reward(self.curr_node, action)
 
     ## Only return a reward the first time we reach the destination node.
     ## end the episode immediately after reaching a destination node.
@@ -811,29 +799,30 @@ class GridEnvironmentMultifood(GridEnvironment):
         #self.food_sources.remove(self.curr_node)
         self.remove_and_reset_one_food_source(self.curr_node)
 
-
       if len(self.food_sources) == 0:
         self.reset_food_sources()
 
-def run_walk(env, policy, max_time = 1000, device='cpu'):
-  time_counter = 0
-  node_path =  []
-  states = []
-  edge_path = []
-  action_indices = []
-  rewards = []
-  while not env.end:
-    node_path.append(torch.from_numpy(np.array(env.curr_node)).to(device))
-    states.append(env.get_state().to(device))
-    action_index = policy.get_action(env.get_state().flatten())
-    old_vertex = env.curr_node
-    step_info = env.step(action_index)
-    r = step_info["reward"]
-    action_indices.append(action_index)
-    edge_path.append(torch.from_numpy(np.array((old_vertex, env.curr_node))).to(device))
-    rewards.append(r)
-    time_counter += 1
-    if time_counter > max_time:
-      break
+def run_walk(env, policy, max_time = 1000, seed=None, restart_env=True):
+    time_counter = 0
+    node_path =  []
+    states = []
+    edge_path = []
+    action_indices = []
+    rewards = []
+    device = policy.device
+    if restart_env: env.restart_env()
+    while not env.end:
+        node_path.append(torch.tensor(env.curr_node, device=device))
+        old_vertex = env.curr_node
+        old_state  = env.get_state().to(device)
+        states.append(old_state)
+        action_index = policy.get_action(old_state.flatten().to(device))
+        step_info = env.step(action_index)
+        r = step_info["reward"]
+        action_indices.append(action_index)
+        edge_path.append(torch.tensor([old_vertex, env.curr_node], device=device))
+        rewards.append(r)
+        time_counter += 1
+        if time_counter > max_time: break
 
-  return node_path, edge_path, states, action_indices, rewards
+    return node_path, edge_path, states, action_indices, rewards
